@@ -21,12 +21,11 @@ module.exports = async function getChatList(req, res) {
              LIMIT 1) as last_message_time,
             (SELECT COUNT(*) 
              FROM messages m 
-             WHERE m.project_id = p.id 
-             AND m.timestamp > COALESCE(pm.last_read, '1970-01-01')) as unread_count
+             WHERE m.project_id = p.id) as message_count
         FROM project_members pm
         JOIN projects p ON pm.project_id = p.id
         WHERE pm.user_id = ?
-        ORDER BY last_message_time DESC
+        ORDER BY last_message_time DESC NULLS LAST
     `;
 
     try {
@@ -36,7 +35,19 @@ module.exports = async function getChatList(req, res) {
                 return res.status(500).json({ error: "Failed to fetch chat list" });
             }
 
-            return res.status(200).json(result);
+            // Format the result
+            const formattedResult = result.map(chat => ({
+                project_id: chat.project_id,
+                project_name: chat.project_name,
+                description: chat.description,
+                role: chat.role,
+                last_message: chat.last_message,
+                last_message_time: chat.last_message_time,
+                message_count: chat.message_count || 0,
+                unread_count: 0 // You can implement read status tracking later
+            }));
+
+            return res.status(200).json(formattedResult);
         });
     } catch (error) {
         console.error("Error fetching chat list:", error);
