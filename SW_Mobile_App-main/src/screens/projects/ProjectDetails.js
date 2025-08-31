@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -8,61 +8,130 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ProjectDetails = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { id } = route.params;
+  
+  // Get project data from route params
+  const projectData = route.params?.project;
+  const projectId = projectData?.id || route.params?.projectId || route.params?.id;
+  
+  console.log('Route params:', route.params);
+  console.log('Project data:', projectData);
+  console.log('Project ID extracted:', projectId);
   
   const [project, setProject] = useState({
     id: '',
     name: '',
+    description: '',
+    start_date: '',
+    estimated_end_date: '',
+    image_url: null,
     members: [],
     checklists: []
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get the current logged-in user
-    const getCurrentUser = async () => {
-      try {
-        const userString = await AsyncStorage.getItem('user');
-        if (userString) {
-          const user = JSON.parse(userString);
-          setCurrentUser(user);
-        }
-      } catch (error) {
-        console.error('Error getting current user:', error);
-      }
-    };
+    getCurrentUser();
+    fetchProjectDetails();
+  }, [projectId]);
 
-    // Fetch project details from backend
-    const fetchProjectDetails = async () => {
-      try {
-        const response = await axios.get(`http://192.168.8.116:3000/api/project/${id}`);
-        setProject(response.data);
-      } catch (error) {
-        console.error('Error fetching project details:', error);
-        // Set default state to prevent mapping errors
+  // Get the current logged-in user
+  const getCurrentUser = async () => {
+    try {
+      const email = await AsyncStorage.getItem('email');
+      const username = await AsyncStorage.getItem('username');
+      const userId = await AsyncStorage.getItem('user_id');
+      
+      if (email && username && userId) {
+        setCurrentUser({
+          id: parseInt(userId),
+          email: email,
+          name: username
+        });
+      }
+    } catch (error) {
+      console.error('Error getting current user:', error);
+    }
+  };
+
+  // Fetch project details from backend
+  const fetchProjectDetails = async () => {
+    if (!projectId) {
+      Alert.alert('Error', 'No project ID provided');
+      navigation.goBack();
+      return;
+    }
+
+    try {
+      // Since we already have the project data from navigation params, use it directly
+      if (projectData) {
+        console.log('Using project data from navigation params');
         setProject({
-          id: id,
-          name: 'Error loading project',
+          id: projectData.id,
+          name: projectData.name || 'Untitled Project',
+          description: projectData.description || 'No description available',
+          start_date: projectData.start_date,
+          estimated_end_date: projectData.estimated_end_date,
+          image_url: projectData.image_url,
+          user_id: projectData.user_id,
+          current_stage_id: projectData.current_stage_id,
+          members: [], // You might need a separate API call for members
+          checklists: [] // You might need a separate API call for checklists
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Fallback: fetch from API if project data not provided
+      console.log('Fetching project details for ID:', projectId);
+      
+      const email = await AsyncStorage.getItem('email');
+      if (!email) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        navigation.navigate('Login');
+        return;
+      }
+
+      const response = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
+      console.log('All Projects Response:', response.data);
+      
+      // Filter to find the specific project
+      const foundProject = response.data.find(p => p.id === parseInt(projectId));
+      console.log('Found project:', foundProject);
+      
+      if (foundProject) {
+        setProject({
+          id: foundProject.id,
+          name: foundProject.name || 'Untitled Project',
+          description: foundProject.description || 'No description available',
+          start_date: foundProject.start_date,
+          estimated_end_date: foundProject.estimated_end_date,
+          image_url: foundProject.image_url,
+          user_id: foundProject.user_id,
+          current_stage_id: foundProject.current_stage_id,
           members: [],
           checklists: []
         });
+      } else {
+        Alert.alert('Error', 'Project not found');
+        navigation.goBack();
       }
-    };
-
-    getCurrentUser();
-    fetchProjectDetails();
-  }, [id]);
+    } catch (error) {
+      console.error('Error fetching project details:', error);
+      console.error('Error details:', error.response?.status, error.response?.data);
+      Alert.alert('Error', 'Failed to load project details');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Display members including the current user
   const getDisplayMembers = () => {
-    // Make sure project.members exists and is an array
     const projectMembers = project.members || [];
-    
-    // Create a new array - don't modify the original
     const members = [...projectMembers];
     
-    // Check if current user exists and is not already in the members list
     if (currentUser && currentUser.id) {
       const currentUserExists = members.some(member => member && member.id === currentUser.id);
       
@@ -87,8 +156,9 @@ const ProjectDetails = () => {
           text: 'Delete', 
           onPress: async () => {
             try {
-              await axios.delete(`http://192.168.8.116:3000/api/project/${id}`);
-              navigation.navigate('Projects'); // Redirect to projects list
+              await axios.delete(`http://192.168.8.116:3000/api/project/${projectId}`);
+              Alert.alert('Success', 'Project deleted successfully');
+              navigation.navigate('ViewProjects'); // Navigate back to projects list
             } catch (error) {
               console.error('Error deleting project:', error);
               Alert.alert('Error', 'Failed to delete project');
@@ -101,22 +171,31 @@ const ProjectDetails = () => {
   };
 
   const navigateToChat = () => {
-    navigation.navigate('ChatScreen', { id });
+    navigation.navigate('ChatScreen', { id: projectId });
   };
 
   const navigateToMembers = () => {
-    navigation.navigate('ProjectMembers', { id });
+    navigation.navigate('ProjectMembers', { id: projectId });
   };
 
   const navigateToReports = () => {
-    navigation.navigate('ProjectReports', { id });
+    navigation.navigate('ProjectReports', { id: projectId });
   };
 
   const navigateToAddMembers = () => {
-    navigation.navigate('AddMembers', { projectId: id });
+    navigation.navigate('AddMembers', { projectId: projectId });
   };
 
   const displayMembers = getDisplayMembers();
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#F6BD0F" />
+        <Text style={styles.loadingText}>Loading project details...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -128,7 +207,7 @@ const ProjectDetails = () => {
           <Icon name="arrow-left" style={styles.backButtonIcon} />
         </TouchableOpacity>
         
-        <Text style={styles.title}>{project?.name || ''}</Text>
+        <Text style={styles.title}>{project.name}</Text>
         
         <View style={styles.menuContainer}>
           <TouchableOpacity 
@@ -149,13 +228,31 @@ const ProjectDetails = () => {
               
               <TouchableOpacity 
                 style={styles.menuItem} 
-                onPress={() => navigation.navigate('EditProject', { id })}
+                onPress={() => navigation.navigate('EditProject', { id: projectId })}
               >
                 <Text style={styles.menuItemText}>Edit Project</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
+      </View>
+
+      {/* Project Image */}
+      {project.image_url && (
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: project.image_url }} style={styles.projectImage} />
+        </View>
+      )}
+
+      {/* Project Info */}
+      <View style={styles.projectInfo}>
+        <Text style={styles.projectDescription}>{project.description}</Text>
+        <Text style={styles.projectDate}>
+          Start Date: {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'Not set'}
+        </Text>
+        <Text style={styles.projectDate}>
+          End Date: {project.estimated_end_date ? new Date(project.estimated_end_date).toLocaleDateString() : 'Not set'}
+        </Text>
       </View>
 
       <View style={styles.actionButtons}>
@@ -219,7 +316,7 @@ const ProjectDetails = () => {
               )
             ))
           ) : (
-            <Text>No members found</Text>
+            <Text style={styles.noMembersText}>No members found</Text>
           )}
         </View>
       </View>
@@ -235,7 +332,7 @@ const ProjectDetails = () => {
               <Text style={styles.checklistName}>{project.name}</Text>
             </View>
           ) : (
-            <Text style={styles.emptyChecklist}>0 / 0 {project.name || ''}</Text>
+            <Text style={styles.emptyChecklist}>0 / 0 {project.name}</Text>
           )}
         </View>
       </View>
@@ -248,6 +345,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#118B50',
     padding: 20,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 10,
+    fontSize: 16,
   },
   header: {
     flexDirection: 'row',
@@ -268,6 +374,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  imageContainer: {
+    marginBottom: 20,
+  },
+  projectImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+  },
+  projectInfo: {
+    backgroundColor: '#FFFFFF',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  projectDescription: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 10,
+  },
+  projectDate: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
   },
   menuContainer: {
     position: 'relative',
@@ -300,7 +430,7 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: '#333',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -386,6 +516,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
+  noMembersText: {
+    color: '#FFFFFF',
+    fontStyle: 'italic',
+  },
   checklistsContainer: {
     backgroundColor: '#F5F5F5',
     borderRadius: 10,
@@ -397,7 +531,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   checklistName: {
-    color: '#FFFFFF',
+    color: '#333',
   },
   emptyChecklist: {
     color: '#757575',

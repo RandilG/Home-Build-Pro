@@ -105,6 +105,7 @@ const Dashboard = () => {
                 { icon: 'home', label: 'Dashboard', screen: 'Dashboard' },
                 { icon: 'view-grid', label: 'Projects', screen: 'ViewProjects' },
                 { icon: 'flag-checkered', label: 'Milestones', screen: 'UpcommingStages' },
+                { icon: 'currency-usd', label: 'Expenses', screen: 'ExpenseTracking' },
                 { icon: 'plus-circle', label: 'Add Project', screen: 'AddProject' },
                 { icon: 'magnify', label: 'Search', screen: 'Search' },
                 { icon: 'account', label: 'Profile', screen: 'ProfileScreen' },

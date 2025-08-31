@@ -40,6 +40,17 @@ const addProjectMembers = require('../components/projectMembers/addProjectMember
 // Stages
 const stagesController = require('../components/stages/stagesController');
 
+// Expense Components
+const addNewExpense = require('../components/expenses/addExpense');
+const getProjectExpenses = require('../components/expenses/getProjectExpenses');
+const getUserExpenses = require('../components/expenses/getUserExpenses');
+const getExpenseDetails = require('../components/expenses/getExpenseDetails');
+const updateExpense = require('../components/expenses/updateExpense');
+const deleteExpense = require('../components/expenses/deleteExpense');
+const { getUserBudget, setUserBudget } = require('../components/expenses/manageBudget');
+const getExpenseAnalytics = require('../components/expenses/getExpenseAnalytics');
+const getExpenseSummary = require('../components/expenses/getExpenseSummary');
+
 // Test
 const mailTest = require('../components/test/mailTest');
 
@@ -119,6 +130,22 @@ router.post('/projects/:id/messages', createProjectMessage);
 // Project members routes
 router.get('/projects/:id/members', getProjectMembers);
 router.post('/projects/:id/members', addProjectMembers);
+
+// Expense routes
+router.post('/expenses', addNewExpense);                              // Add new expense
+router.get('/expenses/project/:projectId', getProjectExpenses);       // Get project expenses
+router.get('/expenses/user/:email', getUserExpenses);                 // Get user expenses
+router.get('/expenses/:id', getExpenseDetails);                       // Get expense details
+router.put('/expenses/:id', updateExpense);                           // Update expense
+router.delete('/expenses/:id', deleteExpense);                        // Delete expense
+
+// Budget routes
+router.get('/budget/:email', getUserBudget);                          // Get user budget
+router.put('/budget/:email', setUserBudget);                          // Set user budget
+
+// Analytics routes
+router.get('/expenses/analytics/:projectId', getExpenseAnalytics);    // Get expense analytics
+router.get('/expenses/summary/:email', getExpenseSummary);            // Get expense summary for dashboard
 
 // User search route
 router.get('/users/search', searchUsers);

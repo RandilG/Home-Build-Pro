@@ -1,20 +1,45 @@
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 const ViewProjects = () => {
   const navigation = useNavigation();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState(null);
 
   useEffect(() => {
-    fetchProjects();
+    getUserEmail();
   }, []);
 
-  const fetchProjects = async () => {
+  useEffect(() => {
+    if (userEmail) {
+      fetchProjects();
+    }
+  }, [userEmail]);
+
+  const getUserEmail = async () => {
     try {
-      const response = await axios.get('http://192.168.8.116:3000/api/projects');
+      const email = await AsyncStorage.getItem('email'); // Changed from 'userEmail' to 'email'
+      if (email) {
+        setUserEmail(email);
+      } else {
+        Alert.alert('Error', 'No user email found. Please login again.');
+        navigation.navigate('Login'); // Navigate back to login if no email found
+      }
+    } catch (error) {
+      console.error('Error getting user email:', error);
+      Alert.alert('Error', 'Failed to get user information.');
+    }
+  };
+
+  const fetchProjects = async () => {
+    if (!userEmail) return;
+    
+    try {
+      const response = await axios.get(`http://192.168.8.116:3000/api/projects/${userEmail}`);
       setProjects(response.data);
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -41,7 +66,7 @@ const ViewProjects = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Projects</Text>
+      <Text style={styles.title}>My Projects</Text>
       {loading ? (
         <ActivityIndicator size="large" color="#118B50" />
       ) : (

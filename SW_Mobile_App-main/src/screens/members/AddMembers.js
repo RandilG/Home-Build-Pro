@@ -7,7 +7,8 @@ import {
   TextInput, 
   FlatList, 
   StyleSheet,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import axios from 'axios';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -16,27 +17,32 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 const AddMembersScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { id } = route.params;
+  const { projectId } = route.params; // Make sure this matches what ProjectDetails passes
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [currentMembers, setCurrentMembers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Fetch current project members
   useEffect(() => {
     const fetchCurrentMembers = async () => {
       try {
-        const response = await axios.get(`http://192.168.8.116:3000/api/projects/${id}/members`);
+        const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/members`);
         setCurrentMembers(response.data);
       } catch (error) {
         console.error('Error fetching project members:', error);
+        // If endpoint doesn't exist, set empty array
+        setCurrentMembers([]);
       }
     };
     
-    fetchCurrentMembers();
-  }, [id]);
+    if (projectId) {
+      fetchCurrentMembers();
+    }
+  }, [projectId]);
 
   // Search users
   useEffect(() => {
@@ -48,7 +54,7 @@ const AddMembersScreen = () => {
     const searchUsers = async () => {
       setIsSearching(true);
       try {
-        const response = await axios.get(`/api/users/search?q=${searchQuery}`);
+        const response = await axios.get(`http://192.168.8.116:3000/api/users/search?q=${searchQuery}`);
         
         // Filter out users who are already members
         const filteredResults = response.data.filter(
@@ -58,6 +64,7 @@ const AddMembersScreen = () => {
         setSearchResults(filteredResults);
       } catch (error) {
         console.error('Error searching users:', error);
+        setSearchResults([]);
       } finally {
         setIsSearching(false);
       }
@@ -78,14 +85,41 @@ const AddMembersScreen = () => {
   const addMembers = async () => {
     if (selectedUsers.length === 0) return;
     
+    setIsLoading(true);
     try {
-      await axios.post(`/api/projects/${id}/members`, {
+      const response = await axios.post(`http://192.168.8.116:3000/api/projects/${projectId}/members`, {
         userIds: selectedUsers.map(user => user.id)
       });
       
-      navigation.navigate('ProjectDetails', { id });
+      Alert.alert(
+        'Success', 
+        `Successfully added ${response.data.added || selectedUsers.length} member(s)`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate back to ProjectDetails with the project data
+              navigation.navigate('ProjectDetails', { projectId });
+            }
+          }
+        ]
+      );
+      
     } catch (error) {
       console.error('Error adding members:', error);
+      let errorMessage = 'Failed to add members';
+      
+      if (error.response?.status === 403) {
+        errorMessage = 'You do not have permission to add members to this project';
+      } else if (error.response?.status === 404) {
+        errorMessage = 'Project not found';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -102,7 +136,7 @@ const AddMembersScreen = () => {
         </View>
       )}
       <Text style={styles.userName}>{item.name}</Text>
-      <Icon name="check" style={styles.checkIcon} />
+      <Icon name="times" style={styles.removeIcon} />
     </TouchableOpacity>
   );
 
@@ -121,7 +155,10 @@ const AddMembersScreen = () => {
             <Text style={styles.initialText}>{item.name.charAt(0)}</Text>
           </View>
         )}
-        <Text style={styles.userName}>{item.name}</Text>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.name}</Text>
+          <Text style={styles.userEmail}>{item.email}</Text>
+        </View>
         {isSelected && <Icon name="check" style={styles.checkIcon} />}
       </TouchableOpacity>
     );
@@ -142,19 +179,24 @@ const AddMembersScreen = () => {
         <TouchableOpacity 
           style={[
             styles.addButton, 
-            selectedUsers.length === 0 && styles.addButtonDisabled
+            (selectedUsers.length === 0 || isLoading) && styles.addButtonDisabled
           ]} 
           onPress={addMembers}
-          disabled={selectedUsers.length === 0}
+          disabled={selectedUsers.length === 0 || isLoading}
         >
-          <Text style={styles.addButtonText}>Add</Text>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#000000" />
+          ) : (
+            <Text style={styles.addButtonText}>Add</Text>
+          )}
         </TouchableOpacity>
       </View>
       
       <View style={styles.searchContainer}>
+        <Icon name="search" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search users..."
+          placeholder="Search users by name or email..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -176,24 +218,38 @@ const AddMembersScreen = () => {
           <FlatList
             data={selectedUsers}
             renderItem={renderSelectedUser}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.id.toString()}
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.selectedUsersList}
           />
         </View>
       )}
       
-      {isSearching ? (
-        <ActivityIndicator size="large" color="#118B50" style={styles.loader} />
-      ) : searchResults.length > 0 ? (
-        <FlatList
-          data={searchResults}
-          renderItem={renderSearchResult}
-          keyExtractor={item => item.id}
-        />
-      ) : searchQuery.length >= 2 ? (
-        <Text style={styles.noResults}>No users found</Text>
-      ) : null}
+      <View style={styles.searchResultsContainer}>
+        {isSearching ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#118B50" />
+            <Text style={styles.loadingText}>Searching users...</Text>
+          </View>
+        ) : searchResults.length > 0 ? (
+          <FlatList
+            data={searchResults}
+            renderItem={renderSearchResult}
+            keyExtractor={item => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : searchQuery.length >= 2 ? (
+          <Text style={styles.noResults}>No users found matching "{searchQuery}"</Text>
+        ) : (
+          <View style={styles.instructionContainer}>
+            <Icon name="search" style={styles.instructionIcon} />
+            <Text style={styles.instructionText}>
+              Search for users to add to your project
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -209,6 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 20,
+    paddingTop: 20,
   },
   backButton: {
     padding: 10,
@@ -229,6 +286,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 20,
+    minWidth: 60,
+    alignItems: 'center',
   },
   addButtonText: {
     fontSize: 16,
@@ -241,42 +300,54 @@ const styles = StyleSheet.create({
   searchContainer: {
     position: 'relative',
     marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+  },
+  searchIcon: {
+    fontSize: 16,
+    color: '#757575',
+    marginRight: 10,
   },
   searchInput: {
-    height: 40,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 20,
+    flex: 1,
+    height: 50,
     fontSize: 16,
     color: '#000000',
   },
   clearSearch: {
-    position: 'absolute',
-    right: 15,
-    top: 10,
+    padding: 10,
   },
   clearSearchIcon: {
     fontSize: 16,
     color: '#757575',
   },
   selectedUsersSection: {
-    marginBottom: 30,
+    marginBottom: 20,
+  },
+  selectedUsersList: {
+    maxHeight: 80,
   },
   sectionTitle: {
     fontSize: 18,
     color: '#000000',
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   selectedUser: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    borderRadius: 25,
     paddingHorizontal: 15,
-    paddingVertical: 5,
+    paddingVertical: 8,
     marginRight: 10,
     marginBottom: 10,
+  },
+  searchResultsContainer: {
+    flex: 1,
   },
   userItem: {
     flexDirection: 'row',
@@ -308,24 +379,59 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  userName: {
+  userInfo: {
     flex: 1,
+  },
+  userName: {
     fontSize: 16,
     color: '#000000',
+    fontWeight: '500',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 2,
   },
   checkIcon: {
     fontSize: 18,
     color: '#118B50',
   },
+  removeIcon: {
+    fontSize: 14,
+    color: '#666666',
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666666',
+  },
   noResults: {
     textAlign: 'center',
-    padding: 20,
+    padding: 40,
     color: '#757575',
     fontSize: 16,
   },
-  loader: {
-    marginTop: 20
-  }
+  instructionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  instructionIcon: {
+    fontSize: 48,
+    color: '#CCCCCC',
+    marginBottom: 20,
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#999999',
+    textAlign: 'center',
+  },
 });
 
 export default AddMembersScreen;

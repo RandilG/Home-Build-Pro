@@ -38,6 +38,15 @@ import AddStageScreen from '../screens/stages/AddStageScreen';
 import Chats from '../screens/chat/Chats';
 import ChatScreen from '../screens/chat/ChatScreen';
 
+// 🔹 Expenses - FIXED IMPORTS
+import ExpenseTracking from '../screens/expense/ExpenseTracking';
+import AddExpense from '../screens/expense/AddExpense';
+import ViewAllExpenses from '../screens/expense/ViewAllExpenses';
+import ExpenseDetails from '../screens/expense/ExpenseDetails';
+import ManageBudget from '../screens/expense/ManageBudget';
+import EditExpense from '../screens/expense/EditExpense';
+import ExpenseReports from '../screens/expense/ExpenseReports';
+
 const Stack = createStackNavigator();
 
 const AppNavigation = () => {
@@ -82,6 +91,15 @@ const AppNavigation = () => {
         {/* 🔹 Chat */}
         <Stack.Screen name="Chats" component={Chats} />
         <Stack.Screen name="ChatScreen" component={ChatScreen} />
+
+        {/* 🔹 Expenses */}
+        <Stack.Screen name="ExpenseTracking" component={ExpenseTracking} />
+        <Stack.Screen name="AddExpense" component={AddExpense} />
+        <Stack.Screen name="ViewAllExpenses" component={ViewAllExpenses} />
+        <Stack.Screen name="ExpenseDetails" component={ExpenseDetails} />
+        <Stack.Screen name="ManageBudget" component={ManageBudget} />
+        <Stack.Screen name="EditExpense" component={EditExpense} />
+        <Stack.Screen name="ExpenseReports" component={ExpenseReports} />
 
       </Stack.Navigator>
     </NavigationContainer>
