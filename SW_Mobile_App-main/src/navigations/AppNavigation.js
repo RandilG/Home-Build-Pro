@@ -28,6 +28,7 @@ import ProjectDetails from '../screens/projects/ProjectDetails';
 
 // 🔹 Members
 import AddMembersScreen from '../screens/members/AddMembers';
+import ProjectMembers from '../screens/members/ProjectMembers';
 
 // 🔹 Stages
 import UpcommingStages from '../screens/stages/UpcommingStages';
@@ -83,10 +84,13 @@ const AppNavigation = () => {
         <Stack.Screen name="ViewProjects" component={ViewProjects} />
         <Stack.Screen name="AddProject" component={AddProject} />
         <Stack.Screen name="ProjectDetails" component={ProjectDetails} />
-        <Stack.Screen name="AddMembers" component={AddMembersScreen} />
         <Stack.Screen name="UpcommingStages" component={UpcommingStages} />
         <Stack.Screen name="Stagedetails" component={Stagedetails} />
         <Stack.Screen name="AddStage" component={AddStageScreen} />
+
+        {/* 🔹 Members */}
+        <Stack.Screen name="AddMembers" component={AddMembersScreen} />
+        <Stack.Screen name="ProjectMembers" component={ProjectMembers} />
 
         {/* 🔹 Chat */}
         <Stack.Screen name="Chats" component={Chats} />

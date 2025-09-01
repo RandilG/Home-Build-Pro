@@ -1,9 +1,34 @@
-import { StyleSheet, Text, View, Image, TextInput, TouchableOpacity } from 'react-native';
-import React from 'react';
-import { useNavigation } from '@react-navigation/native'; 
+import { StyleSheet, Text, View, Image, TextInput, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native'; 
+import axios from 'axios';
 
-function Verificationcodefield() {
-    const navigation = useNavigation();
+function Verificationcodefield({ otp, setOtp, onVerify }) {
+    const [error, setError] = useState('');
+
+    const handleOtpChange = (text) => {
+        // Only allow numbers
+        const numericText = text.replace(/[^0-9]/g, '');
+        setOtp(numericText);
+        if (error) {
+            setError('');
+        }
+    };
+
+    const handleVerify = () => {
+        if (!otp.trim()) {
+            setError('Verification code is required');
+            return;
+        }
+        
+        if (otp.length !== 6) {
+            setError('Verification code must be 6 digits');
+            return;
+        }
+
+        setError('');
+        onVerify();
+    };
 
     return (
         <View style={styles.inputContainer}>
@@ -12,21 +37,21 @@ function Verificationcodefield() {
                     placeholder='Enter Verification Code'
                     placeholderTextColor={'#000000'}
                     style={styles.textInput}
+                    value={otp}
+                    onChangeText={handleOtpChange}
+                    keyboardType="numeric"
+                    maxLength={6}
                 />
             </View>
-            <VerifyButton navigation={navigation} />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <VerifyButton onPress={handleVerify} />
         </View>
     );
 }
 
-function VerifyButton({ navigation }) {
-    function gotoVerify() {
-        navigation.navigate('Newpass');
-    }
-
+function VerifyButton({ onPress }) {
     return (
-        // TouchableOpacity containing the verify button
-        <TouchableOpacity onPress={gotoVerify}>
+        <TouchableOpacity onPress={onPress}>
             <View style={styles.verifyButton}>
                 <Text style={styles.verifyButtonText}>Verify</Text>
             </View>
@@ -36,6 +61,51 @@ function VerifyButton({ navigation }) {
 
 const Resetpass2 = () => {
     const navigation = useNavigation(); 
+    const route = useRoute();
+    const [otp, setOtp] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Get email from navigation params
+    const email = route.params?.email || '';
+
+    const handleVerifyOtp = async () => {
+        setIsLoading(true);
+        
+        try {
+            const response = await axios.post('http://192.168.8.116:3000/api/verify-otp', {
+                email: email,
+                otp: otp
+            });
+
+            Alert.alert(
+                'Success', 
+                'OTP verified successfully!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('Newpass', { email: email })
+                    }
+                ]
+            );
+
+        } catch (error) {
+            console.error("OTP Verification Error:", error);
+            
+            if (error.response) {
+                if (error.response.status === 400) {
+                    Alert.alert('Error', 'Invalid or expired verification code');
+                } else {
+                    Alert.alert('Error', error.response.data.message || 'OTP verification failed');
+                }
+            } else if (error.request) {
+                Alert.alert('Network Error', 'Could not connect to server. Please check your internet connection.');
+            } else {
+                Alert.alert('Error', 'An unexpected error occurred');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -49,10 +119,18 @@ const Resetpass2 = () => {
             />
 
             <Text style={styles.description}>
-                In order to verify your identity, enter the verification code that was sent to your mail
+                In order to verify your identity, enter the verification code that was sent to {email}
             </Text>
 
-            <Verificationcodefield navigation={navigation} />
+            <Verificationcodefield 
+                otp={otp}
+                setOtp={setOtp}
+                onVerify={handleVerifyOtp}
+            />
+            
+            {isLoading && (
+                <Text style={styles.loadingText}>Verifying code...</Text>
+            )}
         </View>
     )
 }
@@ -85,7 +163,7 @@ const styles = StyleSheet.create({
         marginTop: 5,
         marginBottom: 20,
         textAlign: 'center',
-        marginHorizontal: 10,
+        marginHorizontal: 20,
     },
     inputContainer: {
         marginTop: 10,
@@ -103,6 +181,12 @@ const styles = StyleSheet.create({
         opacity: 0.6,
         fontSize: 18,
     },
+    errorText: {
+        color: '#FF4040',
+        fontSize: 14,
+        marginTop: 5,
+        textAlign: 'center',
+    },
     verifyButton: {
         backgroundColor: '#F6BD0F',
         height: 40,
@@ -119,5 +203,10 @@ const styles = StyleSheet.create({
         color: '#000000',
         textAlign: 'center',
         fontWeight: 'bold',
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        marginTop: 10,
     },
 });

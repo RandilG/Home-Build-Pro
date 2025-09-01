@@ -1,10 +1,68 @@
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity } from 'react-native';
-import React from 'react';
-import { useNavigation } from '@react-navigation/native'; 
+import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native'; 
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import axios from 'axios';
 
-function Passwordfield() {
-    const navigation = useNavigation(); 
+function Passwordfield({ passwords, setPasswords, onUpdatePassword }) {
+    const [errors, setErrors] = useState({
+        password: '',
+        confirmPassword: ''
+    });
+
+    const validatePassword = (password) => {
+        if (password.length < 8) {
+            return 'Password must be at least 8 characters';
+        }
+        if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password)) {
+            return 'Password must include uppercase, lowercase, number and special character';
+        }
+        return '';
+    };
+
+    const handlePasswordChange = (field, value) => {
+        setPasswords({ ...passwords, [field]: value });
+        
+        // Clear errors when user types
+        if (errors[field]) {
+            setErrors({ ...errors, [field]: '' });
+        }
+    };
+
+    const handleCreate = () => {
+        const newErrors = {
+            password: '',
+            confirmPassword: ''
+        };
+        let isValid = true;
+
+        // Validate password
+        if (!passwords.password) {
+            newErrors.password = 'New password is required';
+            isValid = false;
+        } else {
+            const passwordError = validatePassword(passwords.password);
+            if (passwordError) {
+                newErrors.password = passwordError;
+                isValid = false;
+            }
+        }
+
+        // Validate confirm password
+        if (!passwords.confirmPassword) {
+            newErrors.confirmPassword = 'Please confirm your password';
+            isValid = false;
+        } else if (passwords.password !== passwords.confirmPassword) {
+            newErrors.confirmPassword = 'Passwords do not match';
+            isValid = false;
+        }
+
+        setErrors(newErrors);
+
+        if (isValid) {
+            onUpdatePassword();
+        }
+    };
 
     return (
         <View style={{ marginTop: 20 }}>
@@ -13,28 +71,36 @@ function Passwordfield() {
                     placeholder='Enter New Password'
                     placeholderTextColor={'#000000'}
                     style={styles.input}
+                    value={passwords.password}
+                    onChangeText={(text) => handlePasswordChange('password', text)}
+                    secureTextEntry
+                    autoCapitalize="none"
                 />
             </View>
-            <View style={[styles.inputContainer, { marginTop: 20 }]}>
+            {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+
+            <View style={[styles.inputContainer, { marginTop: errors.password ? 10 : 20 }]}>
                 <TextInput
                     placeholder='Confirm New Password'
                     placeholderTextColor={'#000000'}
                     style={styles.input}
+                    value={passwords.confirmPassword}
+                    onChangeText={(text) => handlePasswordChange('confirmPassword', text)}
+                    secureTextEntry
+                    autoCapitalize="none"
                 />
             </View>
-            <CreateButton navigation={navigation} />
+            {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
+
+            <CreateButton onPress={handleCreate} />
         </View>
     );
 }
 
-function CreateButton({ navigation }) {
-    function gotoCreateButton() {
-        navigation.navigate('Updatedpass');
-    }
-
+function CreateButton({ onPress }) {
     return (
         // TouchableOpacity containing the create button
-        <TouchableOpacity onPress={gotoCreateButton}>
+        <TouchableOpacity onPress={onPress}>
             <View style={styles.button}>
                 <Text style={styles.buttonText}>
                     Create
@@ -46,6 +112,50 @@ function CreateButton({ navigation }) {
 
 const Newpass = () => {
     const navigation = useNavigation(); 
+    const route = useRoute();
+    const [passwords, setPasswords] = useState({
+        password: '',
+        confirmPassword: ''
+    });
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Get email from navigation params
+    const email = route.params?.email || '';
+
+    const handleUpdatePassword = async () => {
+        setIsLoading(true);
+        
+        try {
+            const response = await axios.post('http://192.168.8.116:3000/api/reset-password', {
+                email: email,
+                newPassword: passwords.password
+            });
+
+            Alert.alert(
+                'Success', 
+                'Password updated successfully!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('Updatedpass')
+                    }
+                ]
+            );
+
+        } catch (error) {
+            console.error("Update Password Error:", error);
+            
+            if (error.response) {
+                Alert.alert('Error', error.response.data.message || 'Failed to update password');
+            } else if (error.request) {
+                Alert.alert('Network Error', 'Could not connect to server. Please check your internet connection.');
+            } else {
+                Alert.alert('Error', 'An unexpected error occurred');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         // ScrollView to handle keyboard and avoid tap events
@@ -66,7 +176,14 @@ const Newpass = () => {
                         Your New password must be different from the previous password
                     </Text>
                 </View>
-                <Passwordfield navigation={navigation} />
+                <Passwordfield 
+                    passwords={passwords}
+                    setPasswords={setPasswords}
+                    onUpdatePassword={handleUpdatePassword}
+                />
+                {isLoading && (
+                    <Text style={styles.loadingText}>Updating password...</Text>
+                )}
             </View>
         </KeyboardAwareScrollView>
     )
@@ -124,6 +241,12 @@ const styles = StyleSheet.create({
         fontSize: 18,
         opacity: 0.6,
     },
+    errorText: {
+        color: '#FF4040',
+        fontSize: 14,
+        marginTop: 5,
+        textAlign: 'center',
+    },
     button: {
         backgroundColor: '#F6BD0F',
         height: 40,
@@ -140,6 +263,11 @@ const styles = StyleSheet.create({
         color: '#000000',
         textAlign: 'center',
         fontWeight: 'bold',
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        marginTop: 10,
     },
 });
 

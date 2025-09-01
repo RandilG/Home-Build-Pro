@@ -1,36 +1,61 @@
-import { StyleSheet, Text, View, Image, TextInput, TouchableOpacity } from 'react-native'
-import React from 'react'
+import { StyleSheet, Text, View, Image, TextInput, TouchableOpacity, Alert } from 'react-native'
+import React, { useState } from 'react'
 import { useNavigation } from '@react-navigation/native';
+import axios from 'axios';
 
 // Function for Email field component
-function Emailfield() {
-    const navigation = useNavigation();
+function Emailfield({ email, setEmail, onSendVerification }) {
+    const [error, setError] = useState('');
+
+    const validateEmail = (email) => {
+        const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+        return emailRegex.test(email);
+    };
+
+    const handleEmailChange = (text) => {
+        setEmail(text);
+        if (error) {
+            setError(''); // Clear error when user types
+        }
+    };
+
+    const handleSendVerification = () => {
+        if (!email.trim()) {
+            setError('Email is required');
+            return;
+        }
+        
+        if (!validateEmail(email)) {
+            setError('Please enter a valid email address');
+            return;
+        }
+
+        setError('');
+        onSendVerification();
+    };
     
     return (
-        // Email input field
         <View style={{ marginTop: 10 }}>
             <View style={styles.inputContainer}>
                 <TextInput
                     placeholder='Enter Your Email'
                     placeholderTextColor={'#000000'}
                     style={styles.input}
+                    value={email}
+                    onChangeText={handleEmailChange}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
                 />
             </View>
-            <SendVerificationButton />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            <SendVerificationButton onPress={handleSendVerification} />
         </View>
     );
 }
 
-function SendVerificationButton() {
-    const navigation = useNavigation();
-
-    function gotoResetpass2(){
-        navigation.navigate('Resetpass2')
-    }
-
+function SendVerificationButton({ onPress }) {
     return (
-        // TouchableOpacity containing the button to send verification code
-        <TouchableOpacity onPress={gotoResetpass2}>
+        <TouchableOpacity onPress={onPress}>
             <View style={styles.button}>
                 <Text style={styles.buttonText}>
                     Send Verification Code
@@ -42,6 +67,49 @@ function SendVerificationButton() {
 
 const Resetpass1 = () => {
     const navigation = useNavigation();
+    const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSendVerification = async () => {
+        setIsLoading(true);
+        
+        try {
+            const response = await axios.post('http://192.168.8.116:3000/api/reset-password-verification', {
+                email: email.trim()
+            });
+
+            Alert.alert(
+                'Success', 
+                'Verification code sent to your email!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => navigation.navigate('Resetpass2', { email: email.trim() })
+                    }
+                ]
+            );
+
+        } catch (error) {
+            console.error("Reset Password Error:", error);
+            
+            if (error.response) {
+                // Server responded with an error
+                if (error.response.status === 404) {
+                    Alert.alert('Error', 'No account found with this email address');
+                } else {
+                    Alert.alert('Error', error.response.data.message || 'Failed to send verification code');
+                }
+            } else if (error.request) {
+                // Network error
+                Alert.alert('Network Error', 'Could not connect to server. Please check your internet connection.');
+            } else {
+                // Other error
+                Alert.alert('Error', 'An unexpected error occurred');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -53,9 +121,16 @@ const Resetpass1 = () => {
                 style={styles.image}
             />
             <Text style={styles.description}>
-                Enter your email starting with john******.com to continue
+                Enter your email address to receive a verification code
             </Text>
-            <Emailfield />
+            <Emailfield 
+                email={email} 
+                setEmail={setEmail} 
+                onSendVerification={handleSendVerification}
+            />
+            {isLoading && (
+                <Text style={styles.loadingText}>Sending verification code...</Text>
+            )}
         </View>
     )
 }
@@ -84,6 +159,7 @@ const styles = StyleSheet.create({
         marginTop: 5,
         marginBottom: 20,
         textAlign: 'center',
+        marginHorizontal: 20,
     },
     inputContainer: {
         backgroundColor: '#FFFFFF',
@@ -97,6 +173,13 @@ const styles = StyleSheet.create({
     input: {
         opacity: 0.6,
         fontSize: 18,
+    },
+    errorText: {
+        color: '#FF4040',
+        fontSize: 14,
+        marginLeft: 25,
+        marginTop: 5,
+        textAlign: 'center',
     },
     button: {
         backgroundColor: '#F6BD0F',
@@ -113,6 +196,11 @@ const styles = StyleSheet.create({
         color: '#000000',
         textAlign: 'center',
         fontWeight: 'bold',
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        marginTop: 10,
     },
 });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import axios from 'axios';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -30,11 +30,18 @@ const ProjectDetails = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [membersLoading, setMembersLoading] = useState(false);
 
-  useEffect(() => {
-    getCurrentUser();
-    fetchProjectDetails();
-  }, [projectId]);
+  // Use useFocusEffect to refresh data when screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      getCurrentUser();
+      fetchProjectDetails();
+      if (projectId) {
+        fetchProjectMembers();
+      }
+    }, [projectId])
+  );
 
   // Get the current logged-in user
   const getCurrentUser = async () => {
@@ -64,10 +71,11 @@ const ProjectDetails = () => {
     }
 
     try {
-      // Since we already have the project data from navigation params, use it directly
+      // Use project data from navigation params if available
       if (projectData) {
         console.log('Using project data from navigation params');
-        setProject({
+        setProject(prev => ({
+          ...prev,
           id: projectData.id,
           name: projectData.name || 'Untitled Project',
           description: projectData.description || 'No description available',
@@ -76,9 +84,7 @@ const ProjectDetails = () => {
           image_url: projectData.image_url,
           user_id: projectData.user_id,
           current_stage_id: projectData.current_stage_id,
-          members: [], // You might need a separate API call for members
-          checklists: [] // You might need a separate API call for checklists
-        });
+        }));
         setLoading(false);
         return;
       }
@@ -101,7 +107,8 @@ const ProjectDetails = () => {
       console.log('Found project:', foundProject);
       
       if (foundProject) {
-        setProject({
+        setProject(prev => ({
+          ...prev,
           id: foundProject.id,
           name: foundProject.name || 'Untitled Project',
           description: foundProject.description || 'No description available',
@@ -110,9 +117,7 @@ const ProjectDetails = () => {
           image_url: foundProject.image_url,
           user_id: foundProject.user_id,
           current_stage_id: foundProject.current_stage_id,
-          members: [],
-          checklists: []
-        });
+        }));
       } else {
         Alert.alert('Error', 'Project not found');
         navigation.goBack();
@@ -127,6 +132,30 @@ const ProjectDetails = () => {
     }
   };
 
+  // Fetch project members separately
+  const fetchProjectMembers = async () => {
+    setMembersLoading(true);
+    try {
+      console.log('Fetching members for project ID:', projectId);
+      const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/members`);
+      console.log('Members response:', response.data);
+      
+      setProject(prev => ({
+        ...prev,
+        members: response.data || []
+      }));
+    } catch (error) {
+      console.error('Error fetching project members:', error);
+      // If the endpoint doesn't exist or fails, keep empty members array
+      setProject(prev => ({
+        ...prev,
+        members: []
+      }));
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
   // Display members including the current user
   const getDisplayMembers = () => {
     const projectMembers = project.members || [];
@@ -136,7 +165,10 @@ const ProjectDetails = () => {
       const currentUserExists = members.some(member => member && member.id === currentUser.id);
       
       if (!currentUserExists) {
-        members.push(currentUser);
+        members.push({
+          ...currentUser,
+          role: 'owner' // Assuming current user is the project owner
+        });
       }
     }
     
@@ -158,7 +190,7 @@ const ProjectDetails = () => {
             try {
               await axios.delete(`http://192.168.8.116:3000/api/project/${projectId}`);
               Alert.alert('Success', 'Project deleted successfully');
-              navigation.navigate('ViewProjects'); // Navigate back to projects list
+              navigation.navigate('ViewProjects');
             } catch (error) {
               console.error('Error deleting project:', error);
               Alert.alert('Error', 'Failed to delete project');
@@ -175,7 +207,11 @@ const ProjectDetails = () => {
   };
 
   const navigateToMembers = () => {
-    navigation.navigate('ProjectMembers', { id: projectId });
+    navigation.navigate('ProjectMembers', { 
+      projectId: projectId,
+      projectName: project.name,
+      members: getDisplayMembers()
+    });
   };
 
   const navigateToReports = () => {
@@ -297,28 +333,44 @@ const ProjectDetails = () => {
           </TouchableOpacity>
         </View>
         
-        <View style={styles.membersList}>
-          {displayMembers && displayMembers.length > 0 ? (
-            displayMembers.map((member, index) => (
-              member && (
-                <View key={member.id || `member-${index}`} style={styles.memberAvatar}>
-                  {member.avatar ? (
-                    <Image 
-                      source={{ uri: member.avatar }} 
-                      style={styles.memberImage} 
-                    />
-                  ) : (
-                    <Text style={styles.memberInitial}>
-                      {member.name && typeof member.name === 'string' ? member.name.charAt(0) : '?'}
-                    </Text>
+        {membersLoading ? (
+          <ActivityIndicator size="small" color="#F6BD0F" />
+        ) : (
+          <View style={styles.membersList}>
+            {displayMembers && displayMembers.length > 0 ? (
+              <View>
+                <View style={styles.membersGrid}>
+                  {displayMembers.slice(0, 6).map((member, index) => (
+                    member && (
+                      <View key={member.id || `member-${index}`} style={styles.memberAvatar}>
+                        {member.avatar ? (
+                          <Image 
+                            source={{ uri: member.avatar }} 
+                            style={styles.memberImage} 
+                          />
+                        ) : (
+                          <Text style={styles.memberInitial}>
+                            {member.name && typeof member.name === 'string' ? member.name.charAt(0).toUpperCase() : '?'}
+                          </Text>
+                        )}
+                      </View>
+                    )
+                  ))}
+                  {displayMembers.length > 6 && (
+                    <TouchableOpacity style={styles.moreMembers} onPress={navigateToMembers}>
+                      <Text style={styles.moreMembersText}>+{displayMembers.length - 6}</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
-              )
-            ))
-          ) : (
-            <Text style={styles.noMembersText}>No members found</Text>
-          )}
-        </View>
+                <TouchableOpacity style={styles.viewAllButton} onPress={navigateToMembers}>
+                  <Text style={styles.viewAllText}>View All Members ({displayMembers.length})</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.noMembersText}>No members found</Text>
+            )}
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -493,8 +545,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   membersList: {
+    marginBottom: 10,
+  },
+  membersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginBottom: 10,
   },
   memberAvatar: {
     width: 50,
@@ -515,6 +571,33 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#FFFFFF',
     fontWeight: 'bold',
+  },
+  moreMembers: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#rgba(246, 189, 15, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  moreMembersText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  viewAllButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  viewAllText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
   noMembersText: {
     color: '#FFFFFF',

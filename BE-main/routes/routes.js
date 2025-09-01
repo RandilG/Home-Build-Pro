@@ -36,6 +36,7 @@ const createProjectMessage = require('../components/projectMessages/createProjec
 // Project Members
 const getProjectMembers = require('../components/projectMembers/getProjectMembers');
 const addProjectMembers = require('../components/projectMembers/addProjectMembers');
+const removeProjectMember = require('../components/projectMembers/removeProjectMember');
 
 // Chat Components (NEW)
 const getChatList = require('../components/chat/getChatList');
@@ -143,6 +144,7 @@ router.post('/projects/:id/messages', createProjectMessage);
 // Project Members Routes
 router.get('/projects/:id/members', getProjectMembers);
 router.post('/projects/:id/members', addProjectMembers);
+router.delete('/projects/:id/members/:memberId', removeProjectMember);
 
 // Chat Routes (NEW)
 router.get('/chats/:userId', getChatList);
