@@ -26,10 +26,10 @@ module.exports = function addProjectMembers(req, res) {
         return res.status(404).json({ message: 'Project not found' });
       }
 
-      // Check if users exist
+      // Check if users exist and get their roles
       const userPlaceholders = userIds.map(() => '?').join(',');
       connection.query(
-        `SELECT id FROM users WHERE id IN (${userPlaceholders})`,
+        `SELECT id, role FROM users WHERE id IN (${userPlaceholders})`,
         userIds,
         (err, existingUsers) => {
           if (err) {
@@ -53,9 +53,9 @@ module.exports = function addProjectMembers(req, res) {
 
               // Filter out users who are already members
               const existingMemberIds = existingMembers.map(row => row.user_id);
-              const newUserIds = userIds.filter(userId => !existingMemberIds.includes(parseInt(userId)));
+              const newUsers = existingUsers.filter(user => !existingMemberIds.includes(parseInt(user.id)));
 
-              if (newUserIds.length === 0) {
+              if (newUsers.length === 0) {
                 return res.status(400).json({ message: 'All selected users are already members' });
               }
 
@@ -63,10 +63,10 @@ module.exports = function addProjectMembers(req, res) {
               let addedCount = 0;
               let processedCount = 0;
 
-              newUserIds.forEach(userId => {
+              newUsers.forEach(user => {
                 connection.query(
                   'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
-                  [id, userId, 'member'],
+                  [id, user.id, user.role], // Use the user's actual role from users table
                   (err, result) => {
                     processedCount++;
                     
@@ -77,7 +77,7 @@ module.exports = function addProjectMembers(req, res) {
                     }
 
                     // When all users have been processed
-                    if (processedCount === newUserIds.length) {
+                    if (processedCount === newUsers.length) {
                       return res.status(201).json({ 
                         message: 'Members added successfully',
                         added: addedCount,

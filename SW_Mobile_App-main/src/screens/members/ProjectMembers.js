@@ -117,7 +117,7 @@ const ProjectMembers = () => {
 
   const renderMember = ({ item: member }) => {
     const isCurrentUser = currentUser && member.id === currentUser.id;
-    const isOwner = member.role === 'owner' || isCurrentUser;
+    const isOwner = member.role === 'owner';
 
     return (
       <View style={styles.memberItem}>
@@ -143,13 +143,13 @@ const ProjectMembers = () => {
                 styles.memberRole,
                 isOwner && styles.ownerRole
               ]}>
-                {isOwner ? 'Owner' : (member.role || 'Member')}
+                {member.role || 'Member'}
               </Text>
             </View>
           </View>
         </View>
         
-        {!isCurrentUser && (
+        {!isCurrentUser && !isOwner && (
           <TouchableOpacity 
             style={styles.removeButton}
             onPress={() => removeMember(member.id)}

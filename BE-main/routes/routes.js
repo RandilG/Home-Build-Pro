@@ -36,7 +36,7 @@ const createProjectMessage = require('../components/projectMessages/createProjec
 // Project Members
 const getProjectMembers = require('../components/projectMembers/getProjectMembers');
 const addProjectMembers = require('../components/projectMembers/addProjectMembers');
-const removeProjectMember = require('../components/projectMembers/removeProjectMember');
+const removeProjectMember = require('../components/projectMembers/removeMember');
 
 // Chat Components (NEW)
 const getChatList = require('../components/chat/getChatList');
