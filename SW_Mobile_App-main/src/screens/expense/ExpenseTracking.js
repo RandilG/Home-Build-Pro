@@ -30,18 +30,26 @@ const ExpenseTracking = () => {
         setLoading(true);
 
         const email = await AsyncStorage.getItem('email');
+        console.log('Email from AsyncStorage:', email);
+        
         if (!email) {
           console.error('No email found in AsyncStorage');
+          Alert.alert('Error', 'Please login again');
+          navigation.navigate('Login');
           setLoading(false);
           return;
         }
 
         // Fetch user data
+        console.log('Fetching user data for email:', email);
         const userResponse = await axios.get(`http://192.168.8.116:3000/api/get-user/${email}`);
+        console.log('User data response:', userResponse.data);
         setUserData(userResponse.data);
 
         // Fetch projects
+        console.log('Fetching projects for email:', email);
         const projectsResponse = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
+        console.log('Projects response:', projectsResponse.data);
         const projectsData = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
         setProjects(projectsData);
 
@@ -50,9 +58,11 @@ const ExpenseTracking = () => {
 
           // Fetch expenses for current project
           try {
+            console.log('Fetching expenses for project ID:', projectsData[0].id);
             const expensesResponse = await axios.get(
-              `http://192.168.8.116:3000/api/expenses/${projectsData[0].id}`
+              `http://192.168.8.116:3000/api/expenses/project/${projectsData[0].id}`
             );
+            console.log('Expenses response:', expensesResponse.data);
             
             // Ensure expenses is always an array
             const expensesData = Array.isArray(expensesResponse.data) ? expensesResponse.data : [];
@@ -66,29 +76,32 @@ const ExpenseTracking = () => {
             setTotalExpenses(total);
             
           } catch (expenseError) {
-            console.error('Error fetching expenses:', expenseError);
+            console.error('Error fetching expenses:', expenseError.response?.data || expenseError.message);
             setExpenses([]); // Set empty array as fallback
             setTotalExpenses(0);
           }
         } else {
           // No projects found
+          console.log('No projects found for user');
           setExpenses([]);
           setTotalExpenses(0);
         }
 
         // Fetch monthly budget
         try {
+          console.log('Fetching budget for email:', email);
           const budgetResponse = await axios.get(`http://192.168.8.116:3000/api/budget/${email}`);
+          console.log('Budget response:', budgetResponse.data);
           const budgetAmount = parseFloat(budgetResponse.data?.monthlyBudget) || 0;
           setMonthlyBudget(budgetAmount);
         } catch (budgetError) {
-          console.error('Error fetching budget:', budgetError);
+          console.error('Error fetching budget:', budgetError.response?.data || budgetError.message);
           setMonthlyBudget(0);
         }
 
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching expense data:', error);
+        console.error('Error fetching expense data:', error.response?.data || error.message);
         Alert.alert('Error', 'Failed to load expense data. Please check your connection and try again.');
         setLoading(false);
       }

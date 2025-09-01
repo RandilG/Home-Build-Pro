@@ -33,6 +33,17 @@ const deleteProject = require('../components/project/deleteProject');
 const getProjectMessages = require('../components/projectMessages/getProjectMessages');
 const createProjectMessage = require('../components/projectMessages/createProjectMessage');
 
+// Project Photos
+const getProjectPhotos = require('../components/projectPhotos/getProjectPhotos');
+const uploadProjectPhoto = require('../components/projectPhotos/uploadProjectPhoto');
+
+// Project Reports
+const getProjectReports = require('../components/projectReports/getProjectReports');
+const uploadProjectReport = require('../components/projectReports/uploadProjectReport');
+
+// Content View Tracking
+const trackContentView = require('../components/projectContent/trackContentView');
+
 // Project Members
 const getProjectMembers = require('../components/projectMembers/getProjectMembers');
 const addProjectMembers = require('../components/projectMembers/addProjectMembers');
@@ -94,8 +105,8 @@ router.put('/upload-image', (req, res) => {
     uploadImage(req, res);
 });
 
-router.get('/get-user/:id', (req, res) => {
-    getUserById(req, res);
+router.post('/upload-profile-image', (req, res) => {
+    uploadImage(req, res);
 });
 
 router.get('/get-user/:email', ProfileController.getUserProfile);
@@ -115,6 +126,33 @@ router.post('/update-settings/:email', settingsController.updateSettings);
 // Root route
 router.get('/', (req, res) => {
     res.json({ message: "Server is running" });
+});
+
+// Test database connection
+router.get('/test-db', (req, res) => {
+    const connection = require('../services/connection');
+    connection.query('SELECT 1 as test', (err, result) => {
+        if (err) {
+            console.error('Database connection test failed:', err);
+            return res.status(500).json({ error: 'Database connection failed', details: err.message });
+        }
+        res.json({ message: 'Database connection successful', result });
+    });
+});
+
+// Test user endpoint
+router.get('/test-user/:email', (req, res) => {
+    const connection = require('../services/connection');
+    const { email } = req.params;
+    
+    const sql = 'SELECT id, name, email FROM users WHERE email = ?';
+    connection.query(sql, [email], (err, result) => {
+        if (err) {
+            console.error('Test user query failed:', err);
+            return res.status(500).json({ error: 'Database query failed', details: err.message });
+        }
+        res.json({ message: 'User query successful', user: result[0] || null });
+    });
 });
 
 // Test Routes
@@ -140,6 +178,17 @@ router.delete('/projects/:id', deleteProject);
 // Project Messages Routes (UPDATED for WebSocket support)
 router.get('/projects/:id/messages', getProjectMessages);
 router.post('/projects/:id/messages', createProjectMessage);
+
+// Project Photos Routes
+router.get('/projects/:id/photos', getProjectPhotos);
+router.post('/projects/:id/photos', uploadProjectPhoto);
+
+// Project Reports Routes
+router.get('/projects/:id/reports', getProjectReports);
+router.post('/projects/:id/reports', uploadProjectReport);
+
+// Content View Tracking
+router.post('/projects/content/view', trackContentView);
 
 // Project Members Routes
 router.get('/projects/:id/members', getProjectMembers);

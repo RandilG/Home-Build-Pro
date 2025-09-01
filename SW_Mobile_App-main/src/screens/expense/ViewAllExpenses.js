@@ -31,7 +31,7 @@ const ViewAllExpenses = () => {
     { name: 'materials', label: 'Materials', icon: 'hammer-wrench' },
     { name: 'labor', label: 'Labor', icon: 'account-hard-hat' },
     { name: 'transport', label: 'Transport', icon: 'truck' },
-    { name: 'permits', label: 'Permits', icon: 'file-document' },
+                          { name: 'permits', label: 'Permits', icon: 'file-document-outline' },
     { name: 'equipment', label: 'Equipment', icon: 'tools' },
     { name: 'utilities', label: 'Utilities', icon: 'lightning-bolt' },
     { name: 'other', label: 'Other', icon: 'receipt' },

@@ -299,11 +299,11 @@ const ProjectDetails = () => {
           <Text style={styles.actionText}>Chat</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectPhotos', { projectId, projectName: project.name })}>
           <View style={styles.iconCircle}>
             <Icon name="camera" style={styles.actionIcon} />
           </View>
-          <Text style={styles.actionText}>Take photo</Text>
+          <Text style={styles.actionText}>Photos</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.actionButton} onPress={navigateToMembers}>
@@ -313,9 +313,9 @@ const ProjectDetails = () => {
           <Text style={styles.actionText}>Members</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.actionButton} onPress={navigateToReports}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectReports', { projectId, projectName: project.name })}>
           <View style={styles.iconCircle}>
-            <Icon name="plus" style={styles.actionIcon} />
+                            <Icon name="file-text-o" style={styles.actionIcon} />
           </View>
           <Text style={styles.actionText}>Reports</Text>
         </TouchableOpacity>

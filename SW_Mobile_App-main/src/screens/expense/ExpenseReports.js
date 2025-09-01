@@ -87,7 +87,7 @@ const ExpenseReports = () => {
       materials: 'hammer-wrench',
       labor: 'account-hard-hat',
       transport: 'truck',
-      permits: 'file-document',
+                              permits: 'file-document-outline',
       equipment: 'tools',
       utilities: 'lightning-bolt',
       other: 'receipt',

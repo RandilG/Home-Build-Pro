@@ -29,6 +29,11 @@ const ChatScreen = () => {
   const flatListRef = useRef(null);
   const wsRef = useRef(null);
 
+  // Debug logging
+  console.log('ChatScreen - Route params:', route.params);
+  console.log('ChatScreen - ProjectId:', projectId);
+  console.log('ChatScreen - ProjectName:', projectName);
+
   // Fetch user info from AsyncStorage
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -44,11 +49,14 @@ const ChatScreen = () => {
             email: email
           });
         } else {
-          Alert.alert('Error', 'User information not found. Please login again.');
-          navigation.navigate('Login');
+          setLoading(false);
+          Alert.alert('Error', 'User information not found. Please login again.', [
+            { text: 'OK', onPress: () => navigation.navigate('Login') }
+          ]);
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
+        setLoading(false);
         Alert.alert('Error', 'Failed to load user information.');
       }
     };
@@ -56,20 +64,56 @@ const ChatScreen = () => {
     fetchUserInfo();
   }, []);
 
+  // Check for required parameters first
+  useEffect(() => {
+    console.log('Checking projectId:', projectId, 'Type:', typeof projectId);
+    
+    if (!projectId || projectId === 'undefined' || projectId === 'null') {
+      setLoading(false);
+      Alert.alert('Error', 'Invalid project. Please select a chat from the list.', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+      return;
+    }
+    
+    // Ensure projectId is a valid number
+    if (isNaN(parseInt(projectId))) {
+      setLoading(false);
+      Alert.alert('Error', 'Invalid project ID. Please select a chat from the list.', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+      return;
+    }
+  }, [projectId]);
+
   // Fetch message history and setup WebSocket
   useEffect(() => {
-    if (!user || !projectId) return;
+    if (!user || !projectId) {
+      return;
+    }
 
     const fetchMessages = async () => {
       try {
-        const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/messages`);
+        console.log('Fetching messages for projectId:', projectId);
+        const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/messages`, { 
+          timeout: 10000 
+        });
+        console.log('Messages API response:', response.data);
         setMessages(Array.isArray(response.data) ? response.data : []);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching messages:', error);
         setMessages([]);
         setLoading(false);
-        Alert.alert('Error', 'Failed to load chat messages.');
+        if (error.code === 'ECONNABORTED') {
+          Alert.alert('Error', 'Connection timeout. Please check your network connection.');
+        } else if (error.response?.status === 403) {
+          Alert.alert('Access Denied', 'You are not a member of this project. Please contact the project owner.');
+        } else if (error.response?.status === 404) {
+          Alert.alert('Error', 'Project not found. Please check if the project still exists.');
+        } else {
+          Alert.alert('Error', 'Failed to load chat messages. Please try again.');
+        }
       }
     };
     

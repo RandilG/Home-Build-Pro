@@ -97,8 +97,47 @@ const ProfileScreen = ({ navigation }) => {
       quality: 0.5,
     });
     
-    if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      try {
+        const selectedImage = result.assets[0];
+        
+        // Create form data for upload
+        const formData = new FormData();
+        formData.append('profileImage', {
+          uri: selectedImage.uri,
+          type: selectedImage.type || 'image/jpeg',
+          name: 'profile-image.jpg'
+        });
+        formData.append('userId', userData.id);
+        
+        // Upload image to backend
+        const uploadResponse = await axios.post(
+          'http://192.168.8.116:3000/api/upload-profile-image',
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+        
+        if (uploadResponse.data.success) {
+          // Update local state with new image URL
+          const newImageUrl = uploadResponse.data.imageUrl;
+          setProfileImage(newImageUrl);
+          
+          // Update user data
+          setUserData(prev => ({
+            ...prev,
+            profileImage: newImageUrl
+          }));
+          
+          Alert.alert('Success', 'Profile image updated successfully');
+        }
+      } catch (error) {
+        console.error('Error uploading profile image:', error);
+        Alert.alert('Error', 'Failed to upload profile image');
+      }
     }
   };
 
@@ -142,7 +181,14 @@ const ProfileScreen = ({ navigation }) => {
           disabled={!isEditing}
         >
           {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            <Image 
+              source={{ 
+                uri: profileImage.startsWith('http') 
+                  ? profileImage 
+                  : `http://192.168.8.116:3000${profileImage}` 
+              }} 
+              style={styles.profileImage} 
+            />
           ) : (
             <View style={styles.placeholderImage}>
               <Icon name="account" size={80} color="#FFFFFF" />

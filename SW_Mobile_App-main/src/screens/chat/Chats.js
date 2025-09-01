@@ -77,12 +77,19 @@ const Chats = () => {
   const fetchUserAndChats = async () => {
     try {
       const userId = await AsyncStorage.getItem('user_id');
+      const userName = await AsyncStorage.getItem('username');
+      const email = await AsyncStorage.getItem('email');
+      
+      console.log('User info from AsyncStorage:', { userId, userName, email });
+      
       if (!userId) {
+        console.log('No userId found, navigating to Login');
         navigation.navigate('Login');
         return;
       }
       
       setUser({ id: parseInt(userId) });
+      console.log('Fetching chats for user:', parseInt(userId));
       await fetchChatList(userId);
     } catch (error) {
       console.error('Error fetching user info:', error);
@@ -92,8 +99,22 @@ const Chats = () => {
 
   const fetchChatList = async (userId) => {
     try {
+      console.log('Fetching chat list for userId:', userId);
       const response = await axios.get(`http://192.168.8.116:3000/api/chats/${userId}`);
-      setChatList(Array.isArray(response.data) ? response.data : []);
+      console.log('Chat list API response:', response.data);
+      console.log('Response type:', typeof response.data);
+      console.log('Is array:', Array.isArray(response.data));
+      
+      const chatData = Array.isArray(response.data) ? response.data : [];
+      console.log('Processed chat data:', chatData);
+      
+      if (chatData.length > 0) {
+        console.log('First chat item:', chatData[0]);
+        console.log('First chat project_id:', chatData[0].project_id);
+        console.log('First chat project_name:', chatData[0].project_name);
+      }
+      
+      setChatList(chatData);
     } catch (error) {
       console.error('Error fetching chat list:', error);
       setChatList([]);
@@ -111,6 +132,11 @@ const Chats = () => {
   };
 
   const openChat = (project) => {
+    console.log('Opening chat for project:', project);
+    console.log('Navigation params:', {
+      projectId: project.project_id,
+      projectName: project.project_name
+    });
     navigation.navigate('ChatScreen', {
       projectId: project.project_id,
       projectName: project.project_name
@@ -137,6 +163,17 @@ const Chats = () => {
       <View style={styles.chatHeader}>
         <Text style={styles.chatHeaderText}>Chats</Text>
         <Icon style={styles.chatIcon} name="chat" size={35} color="#FFB300" />
+        <TouchableOpacity 
+          style={styles.debugButton}
+          onPress={() => {
+            if (user) {
+              console.log('Manual refresh triggered for user:', user.id);
+              fetchChatList(user.id);
+            }
+          }}
+        >
+          <Icon name="refresh" size={20} color="#FFB300" />
+        </TouchableOpacity>
       </View>
       
       <ScrollView 
@@ -164,6 +201,9 @@ const Chats = () => {
             <Text style={styles.noChatText}>No project chats available</Text>
             <Text style={styles.noChatSubText}>
               Join a project to start chatting with team members
+            </Text>
+            <Text style={styles.debugText}>
+              Debug: User ID: {user?.id}, Chats found: {chatList.length}
             </Text>
           </View>
         )}
@@ -291,5 +331,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#FFB300',
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  debugButton: {
+    padding: 8,
+    marginLeft: 10,
   },
 });

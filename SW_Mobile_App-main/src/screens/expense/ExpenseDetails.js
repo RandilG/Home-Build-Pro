@@ -24,7 +24,7 @@ const ExpenseDetails = () => {
     materials: { label: 'Materials', icon: 'hammer-wrench', color: '#FF6B6B' },
     labor: { label: 'Labor', icon: 'account-hard-hat', color: '#4ECDC4' },
     transport: { label: 'Transport', icon: 'truck', color: '#45B7D1' },
-    permits: { label: 'Permits', icon: 'file-document', color: '#96CEB4' },
+    permits: { label: 'Permits', icon: 'file-document-outline', color: '#96CEB4' },
     equipment: { label: 'Equipment', icon: 'tools', color: '#FECA57' },
     utilities: { label: 'Utilities', icon: 'lightning-bolt', color: '#FF9FF3' },
     other: { label: 'Other', icon: 'receipt', color: '#C7ADCE' },

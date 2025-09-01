@@ -25,6 +25,8 @@ import SettingsScreen from '../screens/dashboard/Settings';
 import ViewProjects from '../screens/projects/ViewProjects';
 import AddProject from '../screens/projects/AddProject';
 import ProjectDetails from '../screens/projects/ProjectDetails';
+import ProjectPhotos from '../screens/project/ProjectPhotos';
+import ProjectReports from '../screens/project/ProjectReports';
 
 // 🔹 Members
 import AddMembersScreen from '../screens/members/AddMembers';
@@ -84,6 +86,8 @@ const AppNavigation = () => {
         <Stack.Screen name="ViewProjects" component={ViewProjects} />
         <Stack.Screen name="AddProject" component={AddProject} />
         <Stack.Screen name="ProjectDetails" component={ProjectDetails} />
+        <Stack.Screen name="ProjectPhotos" component={ProjectPhotos} />
+        <Stack.Screen name="ProjectReports" component={ProjectReports} />
         <Stack.Screen name="UpcommingStages" component={UpcommingStages} />
         <Stack.Screen name="Stagedetails" component={Stagedetails} />
         <Stack.Screen name="AddStage" component={AddStageScreen} />
