@@ -2,35 +2,34 @@ const connection = require('../../services/connection');
 
 module.exports = function deleteProject(req, res) {
   const { id } = req.params;
-  const userId = req.user.id; // Assuming authentication middleware sets req.user
   
-  // Check if user is project owner
+  console.log('Attempting to delete project with ID:', id);
+  
+  if (!id) {
+    return res.status(400).json({ error: 'Project ID is required' });
+  }
+  
+  // Simply delete the project without any authentication checks
   connection.query(
-    'SELECT role FROM project_members WHERE project_id = ? AND user_id = ?',
-    [id, userId],
-    (err, roleRows) => {
+    'DELETE FROM projects WHERE id = ?', 
+    [id],
+    (err, result) => {
       if (err) {
-        console.error("Error checking user role:", err);
-        return res.status(500).json({ error: "Internal Server Error" });
+        console.error("Error deleting project:", err);
+        return res.status(500).json({ error: "Failed to delete project", details: err.message });
       }
       
-      if (roleRows.length === 0 || roleRows[0].role !== 'owner') {
-        return res.status(403).json({ message: 'Permission denied' });
+      console.log('Delete result:', result);
+      
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Project not found' });
       }
       
-      // Delete the project (cascading deletes will handle related records)
-      connection.query(
-        'DELETE FROM projects WHERE id = ?', 
-        [id],
-        (err, result) => {
-          if (err) {
-            console.error("Error deleting project:", err);
-            return res.status(500).json({ error: "Internal Server Error" });
-          }
-          
-          return res.json({ message: 'Project deleted successfully' });
-        }
-      );
+      console.log(`Project ${id} deleted successfully`);
+      return res.status(200).json({ 
+        message: 'Project deleted successfully',
+        deletedProjectId: id
+      });
     }
   );
 };

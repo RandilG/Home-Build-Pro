@@ -20,7 +20,11 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 const ChatScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { projectId, projectName } = route.params || {};
+  
+  // Get project ID from different possible route params
+  const projectId = route.params?.projectId || route.params?.id || null;
+  const projectName = route.params?.projectName || 'Project Chat';
+  
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [user, setUser] = useState(null);
@@ -42,21 +46,20 @@ const ChatScreen = () => {
         const userName = await AsyncStorage.getItem('username');
         const email = await AsyncStorage.getItem('email');
         
-        if (userId && userName) {
+        if (userId && userName && email) {
           setUser({
             id: parseInt(userId),
             name: userName,
             email: email
           });
+          console.log('User loaded:', { id: parseInt(userId), name: userName, email });
         } else {
-          setLoading(false);
           Alert.alert('Error', 'User information not found. Please login again.', [
             { text: 'OK', onPress: () => navigation.navigate('Login') }
           ]);
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
-        setLoading(false);
         Alert.alert('Error', 'Failed to load user information.');
       }
     };
@@ -64,29 +67,19 @@ const ChatScreen = () => {
     fetchUserInfo();
   }, []);
 
-  // Check for required parameters first
+  // Check if we have a valid project ID
   useEffect(() => {
-    console.log('Checking projectId:', projectId, 'Type:', typeof projectId);
-    
-    if (!projectId || projectId === 'undefined' || projectId === 'null') {
-      setLoading(false);
-      Alert.alert('Error', 'Invalid project. Please select a chat from the list.', [
+    if (!projectId) {
+      Alert.alert('Error', 'No project selected. Please select a project first.', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
       return;
     }
     
-    // Ensure projectId is a valid number
-    if (isNaN(parseInt(projectId))) {
-      setLoading(false);
-      Alert.alert('Error', 'Invalid project ID. Please select a chat from the list.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
-      return;
-    }
+    console.log('Using project ID:', projectId);
   }, [projectId]);
 
-  // Fetch message history and setup WebSocket
+  // Fetch messages and setup WebSocket
   useEffect(() => {
     if (!user || !projectId) {
       return;
@@ -96,24 +89,31 @@ const ChatScreen = () => {
       try {
         console.log('Fetching messages for projectId:', projectId);
         const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/messages`, { 
-          timeout: 10000 
+          timeout: 15000 
         });
         console.log('Messages API response:', response.data);
-        setMessages(Array.isArray(response.data) ? response.data : []);
-        setLoading(false);
+        
+        if (Array.isArray(response.data)) {
+          setMessages(response.data);
+        } else {
+          console.log('Messages response is not an array, setting empty array');
+          setMessages([]);
+        }
       } catch (error) {
         console.error('Error fetching messages:', error);
+        
+        // Set empty messages array and continue - don't block the chat
         setMessages([]);
-        setLoading(false);
+        
         if (error.code === 'ECONNABORTED') {
-          Alert.alert('Error', 'Connection timeout. Please check your network connection.');
-        } else if (error.response?.status === 403) {
-          Alert.alert('Access Denied', 'You are not a member of this project. Please contact the project owner.');
+          console.log('Connection timeout - continuing with empty messages');
         } else if (error.response?.status === 404) {
-          Alert.alert('Error', 'Project not found. Please check if the project still exists.');
+          console.log('Messages endpoint not found - continuing with empty messages');
         } else {
-          Alert.alert('Error', 'Failed to load chat messages. Please try again.');
+          console.log('Error loading messages - continuing with empty messages');
         }
+      } finally {
+        setLoading(false);
       }
     };
     
@@ -122,6 +122,7 @@ const ChatScreen = () => {
     // Setup WebSocket connection
     const connectWebSocket = () => {
       try {
+        console.log('Connecting to WebSocket...');
         const ws = new WebSocket(`ws://192.168.8.116:3000`);
         wsRef.current = ws;
         
@@ -138,6 +139,8 @@ const ChatScreen = () => {
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            
             if (data.type === 'new_message') {
               setMessages(prevMessages => {
                 // Avoid duplicates
@@ -146,7 +149,6 @@ const ChatScreen = () => {
                 return [...prevMessages, data.message];
               });
             } else if (data.type === 'user_typing') {
-              // Handle typing indicators if needed
               console.log(`User ${data.userId} is ${data.isTyping ? 'typing' : 'not typing'}`);
             }
           } catch (error) {
@@ -158,10 +160,14 @@ const ChatScreen = () => {
           console.error('WebSocket error:', error);
         };
         
-        ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          // Attempt to reconnect after 3 seconds
-          setTimeout(connectWebSocket, 3000);
+        ws.onclose = (event) => {
+          console.log('WebSocket disconnected:', event.code, event.reason);
+          // Attempt to reconnect after 5 seconds
+          setTimeout(() => {
+            if (user && projectId) {
+              connectWebSocket();
+            }
+          }, 5000);
         };
       } catch (error) {
         console.error('Failed to connect WebSocket:', error);
@@ -171,7 +177,7 @@ const ChatScreen = () => {
     connectWebSocket();
     
     return () => {
-      if (wsRef.current) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: 'leave_project',
           projectId: projectId
@@ -185,23 +191,47 @@ const ChatScreen = () => {
   useEffect(() => {
     if (flatListRef.current && messages.length > 0) {
       setTimeout(() => {
-        flatListRef.current.scrollToEnd({ animated: true });
+        try {
+          flatListRef.current.scrollToEnd({ animated: true });
+        } catch (error) {
+          console.log('Error scrolling to end:', error);
+        }
       }, 100);
     }
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !user || sending) return;
+    if (!newMessage.trim() || !user || sending || !projectId) return;
     
     setSending(true);
     const messageToSend = newMessage.trim();
+    const tempId = Date.now(); // Temporary ID for optimistic update
+    
+    // Optimistic update - add message immediately
+    const optimisticMessage = {
+      id: tempId,
+      content: messageToSend,
+      userId: user.id,
+      userName: user.name,
+      timestamp: new Date().toISOString(),
+      isOptimistic: true
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage(''); // Clear input immediately for better UX
     
     try {
       const response = await axios.post(`http://192.168.8.116:3000/api/projects/${projectId}/messages`, {
         content: messageToSend,
         userId: user.id
+      }, {
+        timeout: 10000
       });
+      
+      console.log('Send message response:', response.data);
+      
+      // Remove optimistic message and let WebSocket handle the real message
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       
       if (!response.data.success) {
         throw new Error('Failed to send message');
@@ -209,22 +239,32 @@ const ChatScreen = () => {
       
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setNewMessage(messageToSend); // Restore message on error
+      
+      Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
       setSending(false);
     }
   };
 
   const renderMessage = ({ item }) => {
-    const isSent = item.userId === user?.id;
+    if (!item || !user) return null;
+    
+    const isSent = item.userId === user.id;
     
     return (
       <View style={[styles.messageContainer, isSent ? styles.sentMessage : styles.receivedMessage]}>
         {!isSent && (
-          <Text style={styles.messageSender}>{item.userName}</Text>
+          <Text style={styles.messageSender}>{item.userName || 'Unknown User'}</Text>
         )}
-        <View style={[styles.messageContent, isSent ? styles.sentContent : styles.receivedContent]}>
+        <View style={[
+          styles.messageContent, 
+          isSent ? styles.sentContent : styles.receivedContent,
+          item.isOptimistic && styles.optimisticMessage
+        ]}>
           <Text style={[styles.messageText, isSent ? styles.sentText : styles.receivedText]}>
             {item.content}
           </Text>
@@ -256,6 +296,32 @@ const ChatScreen = () => {
     );
   }
 
+  if (!projectId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={20} color="#000" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Error</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Icon name="exclamation-triangle" size={50} color="#ff6b6b" />
+          <Text style={styles.errorText}>No project selected</Text>
+          <TouchableOpacity 
+            style={styles.errorButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.errorButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -265,10 +331,14 @@ const ChatScreen = () => {
         >
           <Icon name="arrow-left" size={20} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{projectName || 'Project Chat'}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{projectName}</Text>
         <TouchableOpacity 
           style={styles.menuButton}
-          onPress={() => navigation.navigate('ProjectMembers', { projectId })}
+          onPress={() => {
+            if (projectId) {
+              navigation.navigate('ProjectMembers', { projectId });
+            }
+          }}
         >
           <Icon name="users" size={20} color="#000" />
         </TouchableOpacity>
@@ -278,11 +348,15 @@ const ChatScreen = () => {
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id ? item.id.toString() : Math.random().toString()}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => {
           if (flatListRef.current) {
-            flatListRef.current.scrollToEnd({ animated: true });
+            try {
+              flatListRef.current.scrollToEnd({ animated: true });
+            } catch (error) {
+              console.log('Error scrolling to end:', error);
+            }
           }
         }}
         showsVerticalScrollIndicator={false}
@@ -346,6 +420,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginTop: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 15,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  errorButton: {
+    backgroundColor: '#0084ff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  errorButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
@@ -422,6 +520,9 @@ const styles = StyleSheet.create({
   receivedContent: {
     backgroundColor: '#e5e5ea',
     borderBottomLeftRadius: 4,
+  },
+  optimisticMessage: {
+    opacity: 0.7,
   },
   messageText: {
     fontSize: 16,

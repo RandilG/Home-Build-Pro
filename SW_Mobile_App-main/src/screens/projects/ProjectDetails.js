@@ -8,15 +8,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ProjectDetails = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  
+
   // Get project data from route params
   const projectData = route.params?.project;
   const projectId = projectData?.id || route.params?.projectId || route.params?.id;
-  
+
   console.log('Route params:', route.params);
   console.log('Project data:', projectData);
   console.log('Project ID extracted:', projectId);
-  
+
   const [project, setProject] = useState({
     id: '',
     name: '',
@@ -49,7 +49,7 @@ const ProjectDetails = () => {
       const email = await AsyncStorage.getItem('email');
       const username = await AsyncStorage.getItem('username');
       const userId = await AsyncStorage.getItem('user_id');
-      
+
       if (email && username && userId) {
         setCurrentUser({
           id: parseInt(userId),
@@ -91,7 +91,7 @@ const ProjectDetails = () => {
 
       // Fallback: fetch from API if project data not provided
       console.log('Fetching project details for ID:', projectId);
-      
+
       const email = await AsyncStorage.getItem('email');
       if (!email) {
         Alert.alert('Error', 'User email not found. Please login again.');
@@ -101,11 +101,11 @@ const ProjectDetails = () => {
 
       const response = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
       console.log('All Projects Response:', response.data);
-      
+
       // Filter to find the specific project
       const foundProject = response.data.find(p => p.id === parseInt(projectId));
       console.log('Found project:', foundProject);
-      
+
       if (foundProject) {
         setProject(prev => ({
           ...prev,
@@ -139,7 +139,7 @@ const ProjectDetails = () => {
       console.log('Fetching members for project ID:', projectId);
       const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/members`);
       console.log('Members response:', response.data);
-      
+
       setProject(prev => ({
         ...prev,
         members: response.data || []
@@ -160,10 +160,10 @@ const ProjectDetails = () => {
   const getDisplayMembers = () => {
     const projectMembers = project.members || [];
     const members = [...projectMembers];
-    
+
     if (currentUser && currentUser.id) {
       const currentUserExists = members.some(member => member && member.id === currentUser.id);
-      
+
       if (!currentUserExists) {
         members.push({
           ...currentUser,
@@ -171,7 +171,7 @@ const ProjectDetails = () => {
         });
       }
     }
-    
+
     return members;
   };
 
@@ -180,20 +180,38 @@ const ProjectDetails = () => {
       'Delete Project',
       'Are you sure you want to delete this project?',
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel' 
+        {
+          text: 'Cancel',
+          style: 'cancel'
         },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           onPress: async () => {
             try {
-              await axios.delete(`http://192.168.8.116:3000/api/project/${projectId}`);
+              console.log('Deleting project with ID:', projectId);
+
+              // DELETE request with explicit no auth configuration
+              const response = await axios.delete(`http://192.168.8.116:3000/api/projects/${projectId}`, {
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              console.log('Delete response:', response.data);
               Alert.alert('Success', 'Project deleted successfully');
               navigation.navigate('ViewProjects');
+
             } catch (error) {
               console.error('Error deleting project:', error);
-              Alert.alert('Error', 'Failed to delete project');
+              console.error('Error response:', error.response?.data);
+              console.error('Error status:', error.response?.status);
+
+              // Simple error handling
+              if (error.response?.status === 404) {
+                Alert.alert('Error', 'Project not found');
+              } else {
+                Alert.alert('Error', `Failed to delete project: ${error.response?.data?.message || error.message}`);
+              }
             }
           },
           style: 'destructive'
@@ -203,11 +221,15 @@ const ProjectDetails = () => {
   };
 
   const navigateToChat = () => {
-    navigation.navigate('ChatScreen', { id: projectId });
+    console.log('Navigating to chat with projectId:', projectId, 'projectName:', project.name);
+    navigation.navigate('ChatScreen', {
+      projectId: projectId,
+      projectName: project.name || 'Project Chat'
+    });
   };
 
   const navigateToMembers = () => {
-    navigation.navigate('ProjectMembers', { 
+    navigation.navigate('ProjectMembers', {
       projectId: projectId,
       projectName: project.name,
       members: getDisplayMembers()
@@ -236,34 +258,34 @@ const ProjectDetails = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
+        <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <Icon name="arrow-left" style={styles.backButtonIcon} />
         </TouchableOpacity>
-        
+
         <Text style={styles.title}>{project.name}</Text>
-        
+
         <View style={styles.menuContainer}>
-          <TouchableOpacity 
-            style={styles.menuButton} 
+          <TouchableOpacity
+            style={styles.menuButton}
             onPress={() => setMenuOpen(!menuOpen)}
           >
             <Icon name="ellipsis-v" style={styles.menuButtonIcon} />
           </TouchableOpacity>
-          
+
           {menuOpen && (
             <View style={styles.dropdownMenu}>
-              <TouchableOpacity 
-                style={styles.menuItem} 
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={handleDeleteProject}
               >
                 <Text style={styles.menuItemText}>Delete Project</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.menuItem} 
+
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => navigation.navigate('EditProject', { id: projectId })}
               >
                 <Text style={styles.menuItemText}>Edit Project</Text>
@@ -298,24 +320,24 @@ const ProjectDetails = () => {
           </View>
           <Text style={styles.actionText}>Chat</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectPhotos', { projectId, projectName: project.name })}>
           <View style={styles.iconCircle}>
             <Icon name="camera" style={styles.actionIcon} />
           </View>
           <Text style={styles.actionText}>Photos</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.actionButton} onPress={navigateToMembers}>
           <View style={styles.iconCircle}>
             <Icon name="users" style={styles.actionIcon} />
           </View>
           <Text style={styles.actionText}>Members</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectReports', { projectId, projectName: project.name })}>
           <View style={styles.iconCircle}>
-                            <Icon name="file-text-o" style={styles.actionIcon} />
+            <Icon name="file-text-o" style={styles.actionIcon} />
           </View>
           <Text style={styles.actionText}>Reports</Text>
         </TouchableOpacity>
@@ -324,7 +346,7 @@ const ProjectDetails = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Project members</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addMemberButton}
             onPress={navigateToAddMembers}
           >
@@ -332,7 +354,7 @@ const ProjectDetails = () => {
             <Text style={styles.addMemberText}>Add members</Text>
           </TouchableOpacity>
         </View>
-        
+
         {membersLoading ? (
           <ActivityIndicator size="small" color="#F6BD0F" />
         ) : (
@@ -344,9 +366,9 @@ const ProjectDetails = () => {
                     member && (
                       <View key={member.id || `member-${index}`} style={styles.memberAvatar}>
                         {member.avatar ? (
-                          <Image 
-                            source={{ uri: member.avatar }} 
-                            style={styles.memberImage} 
+                          <Image
+                            source={{ uri: member.avatar }}
+                            style={styles.memberImage}
                           />
                         ) : (
                           <Text style={styles.memberInitial}>

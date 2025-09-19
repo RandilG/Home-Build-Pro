@@ -27,6 +27,7 @@ import AddProject from '../screens/projects/AddProject';
 import ProjectDetails from '../screens/projects/ProjectDetails';
 import ProjectPhotos from '../screens/project/ProjectPhotos';
 import ProjectReports from '../screens/project/ProjectReports';
+import EditProject from '../screens/projects/EditProject';
 
 // 🔹 Members
 import AddMembersScreen from '../screens/members/AddMembers';
@@ -49,6 +50,9 @@ import ExpenseDetails from '../screens/expense/ExpenseDetails';
 import ManageBudget from '../screens/expense/ManageBudget';
 import EditExpense from '../screens/expense/EditExpense';
 import ExpenseReports from '../screens/expense/ExpenseReports';
+
+// 🔹 Help Screen
+import Help from '../screens/help/Help';
 
 const Stack = createStackNavigator();
 
@@ -88,6 +92,7 @@ const AppNavigation = () => {
         <Stack.Screen name="ProjectDetails" component={ProjectDetails} />
         <Stack.Screen name="ProjectPhotos" component={ProjectPhotos} />
         <Stack.Screen name="ProjectReports" component={ProjectReports} />
+        <Stack.Screen name="EditProject" component={EditProject} />
         <Stack.Screen name="UpcommingStages" component={UpcommingStages} />
         <Stack.Screen name="Stagedetails" component={Stagedetails} />
         <Stack.Screen name="AddStage" component={AddStageScreen} />
@@ -108,6 +113,9 @@ const AppNavigation = () => {
         <Stack.Screen name="ManageBudget" component={ManageBudget} />
         <Stack.Screen name="EditExpense" component={EditExpense} />
         <Stack.Screen name="ExpenseReports" component={ExpenseReports} />
+
+        {/* 🔹 Help & Support */}
+        <Stack.Screen name="Help" component={Help} />
 
       </Stack.Navigator>
     </NavigationContainer>

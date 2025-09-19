@@ -25,17 +25,40 @@ const SettingsScreen = ({ navigation }) => {
       setLoading(true);
       const userEmail = await AsyncStorage.getItem('email');
       
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching settings for email:', userEmail);
+      
       const response = await axios.get(`http://192.168.8.116:3000/api/user-settings/${userEmail}`);
       
-      if (response.data && response.data.settings) {
+      console.log('Settings response:', response.data);
+      
+      if (response.data && response.data.success && response.data.settings) {
         setSettings(response.data.settings);
+      } else {
+        console.log('Using default settings');
+        // Keep default settings if none found
       }
       
       setLoading(false);
     } catch (error) {
       console.error('Error fetching settings:', error);
       setLoading(false);
-      Alert.alert('Error', 'Failed to load settings');
+      
+      if (error.response) {
+        // Server responded with error status
+        Alert.alert('Error', `Failed to load settings: ${error.response.data.message || 'Unknown error'}`);
+      } else if (error.request) {
+        // Network error
+        Alert.alert('Network Error', 'Please check your internet connection and try again.');
+      } else {
+        // Other error
+        Alert.alert('Error', 'Failed to load settings');
+      }
     }
   };
 
@@ -44,24 +67,50 @@ const SettingsScreen = ({ navigation }) => {
       setSaving(true);
       const userEmail = await AsyncStorage.getItem('email');
       
-      await axios.post(`http://192.168.8.116:3000/api/update-settings/${userEmail}`, {
+      if (!userEmail) {
+        Alert.alert('Error', 'User email not found. Please login again.');
+        setSaving(false);
+        return;
+      }
+
+      console.log('Saving settings for email:', userEmail);
+      console.log('Settings to save:', settings);
+      
+      const response = await axios.post(`http://192.168.8.116:3000/api/update-settings/${userEmail}`, {
         settings
       });
       
+      console.log('Save response:', response.data);
+      
       setSaving(false);
-      Alert.alert('Success', 'Settings updated successfully');
+      
+      if (response.data && response.data.success) {
+        Alert.alert('Success', response.data.message || 'Settings updated successfully');
+      } else {
+        Alert.alert('Error', 'Failed to save settings');
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
       setSaving(false);
-      Alert.alert('Error', 'Failed to save settings');
+      
+      if (error.response) {
+        // Server responded with error status
+        Alert.alert('Error', `Failed to save settings: ${error.response.data.message || 'Unknown error'}`);
+      } else if (error.request) {
+        // Network error
+        Alert.alert('Network Error', 'Please check your internet connection and try again.');
+      } else {
+        // Other error
+        Alert.alert('Error', 'Failed to save settings');
+      }
     }
   };
 
   const toggleSetting = (setting) => {
-    setSettings({
-      ...settings,
-      [setting]: !settings[setting]
-    });
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      [setting]: !prevSettings[setting]
+    }));
   };
 
   const clearCache = async () => {
@@ -79,6 +128,7 @@ const SettingsScreen = ({ navigation }) => {
             try {
               // Clear app cache (example implementation)
               await AsyncStorage.removeItem('app_cache');
+              // You can add more cache clearing logic here
               
               Alert.alert('Success', 'Cache cleared successfully');
             } catch (error) {
@@ -92,10 +142,19 @@ const SettingsScreen = ({ navigation }) => {
     );
   };
 
+  const handlePrivacyPolicy = () => {
+    Alert.alert('Privacy Policy', 'Privacy Policy feature will be implemented soon.');
+  };
+
+  const handleTermsOfService = () => {
+    Alert.alert('Terms of Service', 'Terms of Service feature will be implemented soon.');
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Loading Settings...</Text>
       </View>
     );
   }
@@ -104,6 +163,12 @@ const SettingsScreen = ({ navigation }) => {
     <View style={styles.container}>      
       <ScrollView style={styles.contentContainer}>
         <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
           <Text style={styles.title}>Settings</Text>
         </View>
 
@@ -139,7 +204,7 @@ const SettingsScreen = ({ navigation }) => {
             </View>
           </View>
           
-          {/* Display Settings */}
+          {/* App Settings */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>App Settings</Text>
             
@@ -220,19 +285,19 @@ const SettingsScreen = ({ navigation }) => {
               <Text style={styles.infoValue}>125</Text>
             </View>
             
-            <TouchableOpacity style={styles.linkItem}>
+            <TouchableOpacity style={styles.linkItem} onPress={handlePrivacyPolicy}>
               <Text style={styles.linkText}>Privacy Policy</Text>
               <Icon name="chevron-right" size={24} color="#118B50" />
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.linkItem}>
+            <TouchableOpacity style={styles.linkItem} onPress={handleTermsOfService}>
               <Text style={styles.linkText}>Terms of Service</Text>
               <Icon name="chevron-right" size={24} color="#118B50" />
             </TouchableOpacity>
           </View>
           
           <TouchableOpacity 
-            style={styles.saveButton} 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
             onPress={saveSettings}
             disabled={saving}
           >
@@ -262,6 +327,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 10,
+    fontSize: 16,
+  },
   contentContainer: {
     flex: 1,
     padding: 20,
@@ -270,6 +340,12 @@ const styles = StyleSheet.create({
     marginTop: 60,
     marginBottom: 20,
     paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    marginRight: 15,
+    padding: 5,
   },
   title: {
     fontSize: 30,
@@ -361,6 +437,9 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderRadius: 10,
     marginTop: 10,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#E0C75F',
   },
   saveButtonText: {
     color: '#FFFFFF',

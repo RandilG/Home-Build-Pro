@@ -6,11 +6,12 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 
 const Dashboard = () => {
@@ -19,46 +20,116 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
   const [currentMilestone, setCurrentMilestone] = useState(null);
+  const [upcomingStages, setUpcomingStages] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
+  const API_URL = 'http://192.168.8.116:3000/api';
+
+  // Date formatting utility function
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  };
+
+  // Extract data fetching logic into a separate function
+  const fetchData = useCallback(async (isRefreshing = false) => {
+    try {
+      if (!isRefreshing) {
         setLoading(true);
-
-        const email = await AsyncStorage.getItem('email');
-
-        const userResponse = await axios.get(`http://192.168.8.116:3000/api/get-user/${email}`);
-        setUserData(userResponse.data);
-
-        const projectsResponse = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
-        setProjects(projectsResponse.data);
-
-        if (projectsResponse.data.length > 0) {
-          setCurrentProject(projectsResponse.data[0]);
-        }
-
-        const stagesResponse = await axios.get('http://192.168.8.116:3000/api/stages');
-        setStages(stagesResponse.data);
-
-        if (projectsResponse.data.length > 0 && projectsResponse.data[0].currentStageId) {
-          const currentStage = stagesResponse.data.find(
-            stage => stage.id === projectsResponse.data[0].currentStageId
-          );
-          setCurrentMilestone(currentStage);
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setLoading(false);
       }
-    };
 
-    fetchData();
+      const email = await AsyncStorage.getItem('email');
+      if (!email) {
+        console.log('No email found, user might need to login');
+        return;
+      }
+
+      // Fetch all data in parallel
+      const [userResponse, projectsResponse, stagesResponse] = await Promise.all([
+        axios.get(`${API_URL}/get-user/${email}`).catch(err => {
+          console.error('Error fetching user:', err);
+          return { data: null };
+        }),
+        axios.get(`${API_URL}/projects/${email}`).catch(err => {
+          console.error('Error fetching projects:', err);
+          return { data: [] };
+        }),
+        axios.get(`${API_URL}/stages`).catch(err => {
+          console.error('Error fetching stages:', err);
+          return { data: [] };
+        })
+      ]);
+
+      // Set user data
+      if (userResponse.data) {
+        setUserData(userResponse.data);
+      }
+
+      // Set projects data
+      const projectsData = projectsResponse.data || [];
+      setProjects(projectsData);
+
+      if (projectsData.length > 0) {
+        setCurrentProject(projectsData[0]);
+      } else {
+        setCurrentProject(null);
+      }
+
+      // Set stages data
+      const stagesData = stagesResponse.data || [];
+      setStages(stagesData);
+
+      // Set upcoming stages (show first 3 stages)
+      setUpcomingStages(stagesData.slice(0, 3));
+
+      // Set current milestone
+      if (projectsData.length > 0 && projectsData[0].current_stage_id && stagesData.length > 0) {
+        const currentStage = stagesData.find(
+          stage => stage.id === projectsData[0].current_stage_id
+        );
+        setCurrentMilestone(currentStage || null);
+      } else if (stagesData.length > 0) {
+        // If no current stage ID, show the first available stage
+        setCurrentMilestone(stagesData[0]);
+      } else {
+        setCurrentMilestone(null);
+      }
+
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+      if (isRefreshing) {
+        setRefreshing(false);
+      }
+    }
   }, []);
+
+  // Pull to refresh handler
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData(true);
+  }, [fetchData]);
+
+  // Use useFocusEffect to refresh data whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -67,7 +138,10 @@ const Dashboard = () => {
   const viewMoreProjects = () => navigation.navigate('ViewProjects');
   const viewMoreMilestones = () => navigation.navigate('UpcommingStages');
   const navigateToSearch = () => navigation.navigate('Search');
-  const goToStageDetails = (stage) => navigation.navigate('Stagedetails', { stage });
+  const goToStageDetails = (stage) => navigation.navigate('Stagedetails', { 
+    stage, 
+    onStageUpdated: () => fetchData()
+  });
   const addNewProject = () => navigation.navigate('AddProject');
   const goToProjectDetails = (project) => navigation.navigate('ProjectDetails', { project });
 
@@ -77,6 +151,7 @@ const Dashboard = () => {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', marginTop: 10 }}>Loading...</Text>
       </View>
     );
   }
@@ -107,7 +182,6 @@ const Dashboard = () => {
                 { icon: 'flag-checkered', label: 'Milestones', screen: 'UpcommingStages' },
                 { icon: 'currency-usd', label: 'Expenses', screen: 'ExpenseTracking' },
                 { icon: 'plus-circle', label: 'Add Project', screen: 'AddProject' },
-                { icon: 'magnify', label: 'Search', screen: 'Search' },
                 { icon: 'account', label: 'Profile', screen: 'ProfileScreen' },
                 { icon: 'cog', label: 'Settings', screen: 'Settings' },
                 { icon: 'help-circle', label: 'Help', screen: 'Help' },
@@ -131,14 +205,27 @@ const Dashboard = () => {
         </>
       )}
 
-      <ScrollView style={styles.contentContainer}>
+      <ScrollView 
+        style={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#F6BD0F']} // Android
+            tintColor="#F6BD0F" // iOS
+            title="Pull to refresh..." // iOS
+            titleColor="#FFFFFF" // iOS
+          />
+        }
+      >
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Hello, {userData ? userData.name : '--Name--'}</Text>
+          <Text style={styles.title}>Hello, {userData ? userData.name : 'User'}</Text>
           <Icon style={styles.waveIcon} name="hand-wave" size={30} color="#F6BD0F" />
         </View>
 
         <Text style={styles.subTitle}>Let's Build Your Dream Home</Text>
 
+        {/* Current Project Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Current Project</Text>
           <TouchableOpacity onPress={viewMoreProjects}>
@@ -155,7 +242,8 @@ const Dashboard = () => {
               />
               <View style={styles.eventDetails}>
                 <Text style={styles.eventDetailText1}>{currentProject.name}</Text>
-                <Text style={styles.eventDetailText2}>Started: {currentProject.startDate}</Text>
+                <Text style={styles.eventDetailText2}>Start: {formatDate(currentProject.start_date)}</Text>
+                <Text style={styles.eventDetailText2}>End: {formatDate(currentProject.estimated_end_date)}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={styles.eventDetailText3}>More</Text>
                   <Icon style={{ marginTop: 20 }} name="chevron-right" size={20} color="#000000" />
@@ -164,7 +252,9 @@ const Dashboard = () => {
             </View>
           </TouchableOpacity>
         ) : (
-          <Text style={{ color: '#FFFFFF', fontSize: 18, marginTop: 10 }}>No Projects Available</Text>
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>No Projects Available</Text>
+          </View>
         )}
 
         <TouchableOpacity onPress={addNewProject} style={styles.addButton}>
@@ -172,6 +262,7 @@ const Dashboard = () => {
           <Text style={styles.addButtonText}>Add New Project</Text>
         </TouchableOpacity>
 
+        {/* Current Milestone Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Current Milestone</Text>
           <TouchableOpacity onPress={viewMoreMilestones}>
@@ -183,12 +274,15 @@ const Dashboard = () => {
           <TouchableOpacity onPress={() => goToStageDetails(currentMilestone)}>
             <View style={styles.containerbox}>
               <Image
-                source={currentMilestone.imageUrl ? { uri: currentMilestone.imageUrl } : placeholderImage}
+                source={currentMilestone.image_path 
+                  ? { uri: `${API_URL}${currentMilestone.image_path}` } 
+                  : placeholderImage}
                 style={styles.image}
               />
               <View style={styles.eventDetails}>
                 <Text style={styles.eventDetailText1}>{currentMilestone.name}</Text>
-                <Text style={styles.eventDetailText2}>Start: {currentMilestone.startDate}</Text>
+                <Text style={styles.eventDetailText2}>Start: {formatDate(currentMilestone.start_date)}</Text>
+                <Text style={styles.eventDetailText2}>End: {formatDate(currentMilestone.end_date)}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={styles.eventDetailText3}>More</Text>
                   <Icon style={{ marginTop: 20 }} name="chevron-right" size={20} color="#000000" />
@@ -197,8 +291,55 @@ const Dashboard = () => {
             </View>
           </TouchableOpacity>
         ) : (
-          <Text style={{ color: '#FFFFFF', fontSize: 18, marginTop: 10 }}>No Milestones Available</Text>
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>No Milestones Available</Text>
+          </View>
         )}
+
+        {/* Upcoming Stages Section
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Upcoming Stages</Text>
+          <TouchableOpacity onPress={viewMoreMilestones}>
+            <Text style={styles.viewMoreText}>View All</Text>
+          </TouchableOpacity>
+        </View>
+
+        {upcomingStages.length > 0 ? (
+          upcomingStages.map((stage, index) => (
+            <TouchableOpacity key={index} onPress={() => goToStageDetails(stage)}>
+              <View style={styles.containerbox}>
+                <Image
+                  source={stage.image_path 
+                    ? { uri: `${API_URL}${stage.image_path}` } 
+                    : placeholderImage}
+                  style={styles.image}
+                />
+                <View style={styles.eventDetails}>
+                  <Text style={styles.eventDetailText1}>{stage.name}</Text>
+                  <Text style={styles.eventDetailText2}>Start: {formatDate(stage.start_date)}</Text>
+                  <Text style={styles.eventDetailText2}>End: {formatDate(stage.end_date)}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={styles.eventDetailText3}>More</Text>
+                    <Icon style={{ marginTop: 20 }} name="chevron-right" size={20} color="#000000" />
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.noDataContainer}>
+            <Text style={styles.noDataText}>No Upcoming Stages Available</Text>
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('AddStage')} 
+              style={styles.smallAddButton}
+            >
+              <Text style={styles.smallAddButtonText}>+ Add Stage</Text>
+            </TouchableOpacity>
+          </View>
+        )} */}
+
+        {/* Add some bottom padding for better scrolling */}
+        <View style={{ height: 50 }} />
       </ScrollView>
     </View>
   );
@@ -257,7 +398,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 90, // ensures spacing below hamburger
+    marginTop: 90,
     marginBottom: 5,
     paddingLeft: 10,
   },
@@ -303,6 +444,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 10,
+  },
+  noDataContainer: {
+    backgroundColor: '#E3F0AF',
+    padding: 20,
+    borderRadius: 20,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  noDataText: {
+    fontSize: 16,
+    color: '#555',
+    textAlign: 'center',
+  },
+  smallAddButton: {
+    backgroundColor: '#F6BD0F',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  smallAddButtonText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 
   // Custom hamburger

@@ -2,10 +2,13 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import axios from 'axios';
 
-const Eventdetails = ({ route }) => {
+const API_URL = 'http://192.168.8.116:3000/api';
+
+const Stagedetails = ({ route }) => {
     const navigation = useNavigation();
-    const { stage, setUpcommingStages } = route.params; // Get stage details from navigation
+    const { stage, onStageUpdated } = route.params; // Get stage details from navigation
 
     function goBack() {
         navigation.goBack();
@@ -20,9 +23,20 @@ const Eventdetails = ({ route }) => {
                 { 
                     text: "Delete", 
                     style: "destructive", 
-                    onPress: () => {
-                        setUpcommingStages(prevStages => prevStages.filter(s => s.name !== stage.name));
-                        navigation.goBack();
+                    onPress: async () => {
+                        try {
+                            // Add API call to delete from backend
+                            await axios.delete(`${API_URL}/stages/${stage.id}`);
+                            
+                            // Call the callback to refresh the stages list
+                            if (onStageUpdated) {
+                                onStageUpdated();
+                            }
+                            navigation.goBack();
+                        } catch (error) {
+                            console.error('Error deleting stage:', error);
+                            Alert.alert('Error', 'Failed to delete stage. Please try again.');
+                        }
                     } 
                 }
             ]
@@ -55,8 +69,8 @@ const Eventdetails = ({ route }) => {
             {/* Stage Info */}
             <View style={styles.eventInfoContainer}>
                 <Text style={styles.eventName}>{stage.name}</Text>
-                <Text style={styles.eventDate}>Start: {stage.startDate}</Text>
-                <Text style={styles.eventDate}>End: {stage.endDate}</Text>
+                <Text style={styles.eventDate}>Start: {stage.start_date}</Text>
+                <Text style={styles.eventDate}>End: {stage.end_date}</Text>
             </View>
 
             {/* Description */}
@@ -98,4 +112,4 @@ const styles = StyleSheet.create({
     buttonText: { fontSize: 18, color: '#000', fontWeight: 'bold' },
 });
 
-export default Eventdetails;
+export default Stagedetails;

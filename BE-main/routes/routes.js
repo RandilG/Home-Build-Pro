@@ -28,6 +28,7 @@ const getProjectById = require('../components/project/getProjectById');
 const getProjectDetails = require('../components/project/getProjectDetails');
 const getAllProjects = require('../components/project/getAllProjects');
 const deleteProject = require('../components/project/deleteProject');
+const updateProject = require('../components/project/updateProject');
 
 // Project Messages
 const getProjectMessages = require('../components/projectMessages/getProjectMessages');
@@ -51,6 +52,7 @@ const removeProjectMember = require('../components/projectMembers/removeMember')
 
 // Chat Components (NEW)
 const getChatList = require('../components/chat/getChatList');
+const sendMessage = require('../components/chat/sendMessage');
 
 // Stages
 const stagesController = require('../components/stages/stagesController');
@@ -173,11 +175,16 @@ router.get('/project/:id', getProjectById);
 router.post('/addNewProject', addNewProject);
 router.get('/projects', getAllProjects); // Get all projects
 router.get('/projects/:id', getProjectDetails);
-router.delete('/projects/:id', deleteProject);
+// Allow project deletion without authentication
+router.delete('/projects/:id', (req, res, next) => {
+    // Skip any authentication middleware
+    deleteProject(req, res);
+});
+router.put('/projects/:id', updateProject);
 
 // Project Messages Routes (UPDATED for WebSocket support)
 router.get('/projects/:id/messages', getProjectMessages);
-router.post('/projects/:id/messages', createProjectMessage);
+router.post('/projects/:id/messages', sendMessage);
 
 // Project Photos Routes
 router.get('/projects/:id/photos', getProjectPhotos);

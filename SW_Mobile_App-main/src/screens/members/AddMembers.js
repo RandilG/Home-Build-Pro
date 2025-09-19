@@ -17,7 +17,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 const AddMembersScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { projectId } = route.params; // Make sure this matches what ProjectDetails passes
+  const { projectId, onMembersUpdated } = route.params; // Add callback parameter
   
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -26,15 +26,16 @@ const AddMembersScreen = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const API_URL = 'http://192.168.8.116:3000/api';
+
   // Fetch current project members
   useEffect(() => {
     const fetchCurrentMembers = async () => {
       try {
-        const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/members`);
+        const response = await axios.get(`${API_URL}/projects/${projectId}/members`);
         setCurrentMembers(response.data);
       } catch (error) {
         console.error('Error fetching project members:', error);
-        // If endpoint doesn't exist, set empty array
         setCurrentMembers([]);
       }
     };
@@ -54,7 +55,7 @@ const AddMembersScreen = () => {
     const searchUsers = async () => {
       setIsSearching(true);
       try {
-        const response = await axios.get(`http://192.168.8.116:3000/api/users/search?q=${searchQuery}`);
+        const response = await axios.get(`${API_URL}/users/search?q=${searchQuery}`);
         
         // Filter out users who are already members
         const filteredResults = response.data.filter(
@@ -87,7 +88,7 @@ const AddMembersScreen = () => {
     
     setIsLoading(true);
     try {
-      const response = await axios.post(`http://192.168.8.116:3000/api/projects/${projectId}/members`, {
+      const response = await axios.post(`${API_URL}/projects/${projectId}/members`, {
         userIds: selectedUsers.map(user => user.id)
       });
       
@@ -98,8 +99,12 @@ const AddMembersScreen = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate back to ProjectDetails with the project data
-              navigation.navigate('ProjectDetails', { projectId });
+              // Call the callback to refresh the member list in ProjectDetails
+              if (onMembersUpdated) {
+                onMembersUpdated();
+              }
+              // Navigate back
+              navigation.goBack();
             }
           }
         ]
