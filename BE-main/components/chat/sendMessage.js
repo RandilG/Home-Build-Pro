@@ -1,7 +1,7 @@
 const connection = require('../../services/connection');
 
 module.exports = async function sendMessage(req, res) {
-    const { projectId } = req.params;
+    const { id: projectId } = req.params;
     const { content, userId } = req.body;
 
     console.log('Send message request:', { projectId, userId, content: content?.substring(0, 50) });
@@ -16,9 +16,9 @@ module.exports = async function sendMessage(req, res) {
 
     // Check if user is either the project owner OR a member of this project
     const checkAccessSql = `
-        SELECT 'owner' as role FROM projects p WHERE p.id = ? AND p.user_id = ?
+        SELECT 'owner' as access_type FROM projects p WHERE p.id = ? AND p.user_id = ?
         UNION
-        SELECT 'member' as role FROM project_members pm WHERE pm.project_id = ? AND pm.user_id = ?
+        SELECT 'member' as access_type FROM project_members pm WHERE pm.project_id = ? AND pm.user_id = ?
     `;
 
     try {

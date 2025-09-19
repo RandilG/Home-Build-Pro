@@ -32,7 +32,6 @@ const updateProject = require('../components/project/updateProject');
 
 // Project Messages
 const getProjectMessages = require('../components/projectMessages/getProjectMessages');
-const createProjectMessage = require('../components/projectMessages/createProjectMessage');
 
 // Project Photos
 const getProjectPhotos = require('../components/projectPhotos/getProjectPhotos');

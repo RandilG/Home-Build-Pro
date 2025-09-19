@@ -2,13 +2,14 @@ const connection = require('../../services/connection');
 
 module.exports = async function getChatList(req, res) {
     const { userId } = req.params;
+    
+    console.log('Fetching chat list for user:', userId);
 
     const sql = `
         SELECT DISTINCT
             p.id as project_id,
             p.name as project_name,
             p.description,
-            pm.role,
             (SELECT m.content 
              FROM messages m 
              WHERE m.project_id = p.id 
@@ -35,12 +36,13 @@ module.exports = async function getChatList(req, res) {
                 return res.status(500).json({ error: "Failed to fetch chat list" });
             }
 
+            console.log(`Found ${result.length} chats for user ${userId}`);
+
             // Format the result
             const formattedResult = result.map(chat => ({
                 project_id: chat.project_id,
                 project_name: chat.project_name,
                 description: chat.description,
-                role: chat.role,
                 last_message: chat.last_message,
                 last_message_time: chat.last_message_time,
                 message_count: chat.message_count || 0,
