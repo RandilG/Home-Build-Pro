@@ -6,7 +6,7 @@ module.exports = function getProjectMembers(req, res) {
   console.log('Fetching members for project ID:', id);
   
   connection.query(
-    `SELECT u.id, u.name, u.email, u.profileImage as avatar, pm.role 
+    `SELECT u.id, u.name, u.email, u.profileImage as avatar
      FROM users u
      JOIN project_members pm ON u.id = pm.user_id
      WHERE pm.project_id = ?`,

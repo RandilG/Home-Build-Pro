@@ -106,8 +106,7 @@ const ProjectMembers = () => {
       
       if (!currentUserExists) {
         projectMembers.unshift({
-          ...currentUser,
-          role: 'owner' // Assuming current user is the project owner
+          ...currentUser
         });
       }
     }
@@ -117,7 +116,6 @@ const ProjectMembers = () => {
 
   const renderMember = ({ item: member }) => {
     const isCurrentUser = currentUser && member.id === currentUser.id;
-    const isOwner = member.role === 'owner';
 
     return (
       <View style={styles.memberItem}>
@@ -138,18 +136,10 @@ const ProjectMembers = () => {
               {isCurrentUser && <Text style={styles.youTag}>(You)</Text>}
             </View>
             <Text style={styles.memberEmail}>{member.email}</Text>
-            <View style={styles.roleContainer}>
-              <Text style={[
-                styles.memberRole,
-                isOwner && styles.ownerRole
-              ]}>
-                {member.role || 'Member'}
-              </Text>
-            </View>
           </View>
         </View>
         
-        {!isCurrentUser && !isOwner && (
+        {!isCurrentUser && (
           <TouchableOpacity 
             style={styles.removeButton}
             onPress={() => removeMember(member.id)}
@@ -353,22 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginBottom: 4,
-  },
-  roleContainer: {
-    alignSelf: 'flex-start',
-  },
-  memberRole: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    backgroundColor: '#118B50',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    textTransform: 'capitalize',
-  },
-  ownerRole: {
-    backgroundColor: '#F6BD0F',
-    color: '#000000',
   },
   removeButton: {
     backgroundColor: '#FF4444',

@@ -364,12 +364,12 @@ const ProjectDetails = () => {
           <Text style={styles.actionText}>Members</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectReports', { projectId, projectName: project.name })}>
+        {/* <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('ProjectReports', { projectId, projectName: project.name })}>
           <View style={styles.iconCircle}>
             <Icon name="file-text-o" style={styles.actionIcon} />
           </View>
           <Text style={styles.actionText}>Reports</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       <View style={styles.section}>

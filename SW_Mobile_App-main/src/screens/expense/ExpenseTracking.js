@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -21,94 +22,108 @@ const ExpenseTracking = () => {
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [monthlyBudget, setMonthlyBudget] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-
-        const email = await AsyncStorage.getItem('email');
-        console.log('Email from AsyncStorage:', email);
-        
-        if (!email) {
-          console.error('No email found in AsyncStorage');
-          Alert.alert('Error', 'Please login again');
-          navigation.navigate('Login');
-          setLoading(false);
-          return;
-        }
-
-        // Fetch user data
-        console.log('Fetching user data for email:', email);
-        const userResponse = await axios.get(`http://192.168.8.116:3000/api/get-user/${email}`);
-        console.log('User data response:', userResponse.data);
-        setUserData(userResponse.data);
-
-        // Fetch projects
-        console.log('Fetching projects for email:', email);
-        const projectsResponse = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
-        console.log('Projects response:', projectsResponse.data);
-        const projectsData = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
-        setProjects(projectsData);
-
-        if (projectsData.length > 0) {
-          setCurrentProject(projectsData[0]);
-
-          // Fetch expenses for current project
-          try {
-            console.log('Fetching expenses for project ID:', projectsData[0].id);
-            const expensesResponse = await axios.get(
-              `http://192.168.8.116:3000/api/expenses/project/${projectsData[0].id}`
-            );
-            console.log('Expenses response:', expensesResponse.data);
-            
-            // Ensure expenses is always an array
-            const expensesData = Array.isArray(expensesResponse.data) ? expensesResponse.data : [];
-            setExpenses(expensesData);
-            
-            // Calculate total expenses safely
-            const total = expensesData.reduce((sum, expense) => {
-              const amount = parseFloat(expense.amount) || 0;
-              return sum + amount;
-            }, 0);
-            setTotalExpenses(total);
-            
-          } catch (expenseError) {
-            console.error('Error fetching expenses:', expenseError.response?.data || expenseError.message);
-            setExpenses([]); // Set empty array as fallback
-            setTotalExpenses(0);
-          }
-        } else {
-          // No projects found
-          console.log('No projects found for user');
-          setExpenses([]);
-          setTotalExpenses(0);
-        }
-
-        // Fetch monthly budget
-        try {
-          console.log('Fetching budget for email:', email);
-          const budgetResponse = await axios.get(`http://192.168.8.116:3000/api/budget/${email}`);
-          console.log('Budget response:', budgetResponse.data);
-          const budgetAmount = parseFloat(budgetResponse.data?.monthlyBudget) || 0;
-          setMonthlyBudget(budgetAmount);
-        } catch (budgetError) {
-          console.error('Error fetching budget:', budgetError.response?.data || budgetError.message);
-          setMonthlyBudget(0);
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching expense data:', error.response?.data || error.message);
-        Alert.alert('Error', 'Failed to load expense data. Please check your connection and try again.');
-        setLoading(false);
-      }
-    };
-
     fetchData();
   }, []);
+
+  const fetchData = async (isRefresh = false) => {
+    try {
+      if (!isRefresh) setLoading(true);
+
+      const email = await AsyncStorage.getItem('email');
+      console.log('Email from AsyncStorage:', email);
+      
+      if (!email) {
+        console.error('No email found in AsyncStorage');
+        Alert.alert('Error', 'Please login again');
+        navigation.navigate('Login');
+        if (!isRefresh) setLoading(false);
+        return;
+      }
+
+      // Fetch user data
+      console.log('Fetching user data for email:', email);
+      const userResponse = await axios.get(`http://192.168.8.116:3000/api/get-user/${email}`);
+      console.log('User data response:', userResponse.data);
+      setUserData(userResponse.data);
+
+      // Fetch projects
+      console.log('Fetching projects for email:', email);
+      const projectsResponse = await axios.get(`http://192.168.8.116:3000/api/projects/${email}`);
+      console.log('Projects response:', projectsResponse.data);
+      const projectsData = Array.isArray(projectsResponse.data) ? projectsResponse.data : [];
+      setProjects(projectsData);
+
+      if (projectsData.length > 0) {
+        setCurrentProject(projectsData[0]);
+
+        // Fetch expenses for current project
+        try {
+          console.log('Fetching expenses for project ID:', projectsData[0].id);
+          const expensesResponse = await axios.get(
+            `http://192.168.8.116:3000/api/expenses/project/${projectsData[0].id}`
+          );
+          console.log('Expenses response:', expensesResponse.data);
+          
+          // Ensure expenses is always an array
+          const expensesData = Array.isArray(expensesResponse.data) ? expensesResponse.data : [];
+          setExpenses(expensesData);
+          
+          // Calculate total expenses safely
+          const total = expensesData.reduce((sum, expense) => {
+            const amount = parseFloat(expense.amount) || 0;
+            return sum + amount;
+          }, 0);
+          setTotalExpenses(total);
+          
+        } catch (expenseError) {
+          console.error('Error fetching expenses:', expenseError.response?.data || expenseError.message);
+          setExpenses([]); // Set empty array as fallback
+          setTotalExpenses(0);
+        }
+      } else {
+        // No projects found
+        console.log('No projects found for user');
+        setExpenses([]);
+        setTotalExpenses(0);
+      }
+
+      // Fetch monthly budget
+      try {
+        console.log('Fetching budget for email:', email);
+        const budgetResponse = await axios.get(`http://192.168.8.116:3000/api/budget/${email}`);
+        console.log('Budget response:', budgetResponse.data);
+        const budgetAmount = parseFloat(budgetResponse.data?.monthlyBudget) || 0;
+        setMonthlyBudget(budgetAmount);
+      } catch (budgetError) {
+        console.error('Error fetching budget:', budgetError.response?.data || budgetError.message);
+        setMonthlyBudget(0);
+      }
+
+      if (!isRefresh) setLoading(false);
+    } catch (error) {
+      console.error('Error fetching expense data:', error.response?.data || error.message);
+      if (!isRefresh) {
+        Alert.alert('Error', 'Failed to load expense data. Please check your connection and try again.');
+      }
+      if (!isRefresh) setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchData(true);
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -169,55 +184,19 @@ const ExpenseTracking = () => {
 
   return (
     <View style={styles.container}>
-      {/* Custom Hamburger Menu Button */}
-      <TouchableOpacity style={styles.menuButton} onPress={toggleSidebar}>
-        <View style={styles.line} />
-        <View style={styles.line} />
-        <View style={styles.line} />
-      </TouchableOpacity>
-
-      {sidebarOpen && (
-        <>
-          <View style={styles.sidebar}>
-            <View style={styles.sidebarHeader}>
-              <Text style={styles.sidebarTitle}>Dream Home</Text>
-              <TouchableOpacity onPress={toggleSidebar}>
-                <Icon name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView>
-              {[
-                { icon: 'home', label: 'Dashboard', screen: 'Dashboard' },
-                { icon: 'view-grid', label: 'Projects', screen: 'ViewProjects' },
-                { icon: 'flag-checkered', label: 'Milestones', screen: 'UpcommingStages' },
-                { icon: 'currency-usd', label: 'Expenses', screen: 'ExpenseTracking' },
-                { icon: 'plus-circle', label: 'Add Project', screen: 'AddProject' },
-                { icon: 'magnify', label: 'Search', screen: 'Search' },
-                { icon: 'account', label: 'Profile', screen: 'ProfileScreen' },
-                { icon: 'cog', label: 'Settings', screen: 'Settings' },
-                { icon: 'help-circle', label: 'Help', screen: 'Help' },
-              ].map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.menuItem}
-                  onPress={() => {
-                    toggleSidebar();
-                    navigation.navigate(item.screen);
-                  }}
-                >
-                  <Icon name={item.icon} size={24} color="#FFFFFF" />
-                  <Text style={styles.menuText}>{item.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={toggleSidebar} />
-        </>
-      )}
-
-      <ScrollView style={styles.contentContainer}>
+      <ScrollView 
+        style={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#F6BD0F']} // Android
+            tintColor="#F6BD0F" // iOS
+            title="Pull to refresh" // iOS
+            titleColor="#666" // iOS
+          />
+        }
+      >
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Expense Tracker</Text>
           <Icon style={styles.moneyIcon} name="currency-usd" size={30} color="#F6BD0F" />
@@ -370,12 +349,11 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: 20,
-    paddingTop: 10,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 90,
+    marginTop: 20,
     marginBottom: 5,
     paddingLeft: 10,
   },

@@ -221,11 +221,19 @@ const ChatScreen = () => {
     setNewMessage(''); // Clear input immediately for better UX
     
     try {
+      // Ensure we have a valid user ID
+      if (!user?.id) {
+        throw new Error('User ID is missing');
+      }
+
       const response = await axios.post(`http://192.168.8.116:3000/api/projects/${projectId}/messages`, {
         content: messageToSend,
         userId: user.id
       }, {
-        timeout: 10000
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       console.log('Send message response:', response.data);
@@ -244,7 +252,10 @@ const ChatScreen = () => {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       setNewMessage(messageToSend); // Restore message on error
       
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      const errorMessage = error.response?.status === 403 
+        ? 'You do not have permission to send messages in this project.'
+        : 'Failed to send message. Please try again.';
+      Alert.alert('Error', errorMessage);
     } finally {
       setSending(false);
     }

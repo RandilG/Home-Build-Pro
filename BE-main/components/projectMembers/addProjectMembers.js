@@ -26,10 +26,10 @@ module.exports = function addProjectMembers(req, res) {
         return res.status(404).json({ message: 'Project not found' });
       }
 
-      // Check if users exist and get their roles
+      // Check if users exist
       const userPlaceholders = userIds.map(() => '?').join(',');
       connection.query(
-        `SELECT id, role FROM users WHERE id IN (${userPlaceholders})`,
+        `SELECT id, name, email FROM users WHERE id IN (${userPlaceholders})`,
         userIds,
         (err, existingUsers) => {
           if (err) {
@@ -62,27 +62,44 @@ module.exports = function addProjectMembers(req, res) {
               // Add members one by one to handle individual errors
               let addedCount = 0;
               let processedCount = 0;
+              const errors = [];
 
               newUsers.forEach(user => {
+                console.log(`Adding user ${user.id} to project ${id}`);
+                
                 connection.query(
-                  'INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)',
-                  [id, user.id, user.role], // Use the user's actual role from users table
+                  'INSERT INTO project_members (project_id, user_id) VALUES (?, ?)',
+                  [id, user.id],
                   (err, result) => {
                     processedCount++;
                     
                     if (err) {
-                      console.error("Error adding member:", err);
+                      console.error(`Error adding member ${user.id}:`, err);
+                      errors.push({
+                        userId: user.id,
+                        error: err.message
+                      });
                     } else {
                       addedCount++;
+                      console.log(`Successfully added user ${user.id} to project ${id}`);
                     }
 
                     // When all users have been processed
                     if (processedCount === newUsers.length) {
+                      if (addedCount === 0) {
+                        return res.status(500).json({ 
+                          message: 'Failed to add any members',
+                          errors: errors
+                        });
+                      }
+                      
                       return res.status(201).json({ 
                         message: 'Members added successfully',
                         added: addedCount,
+                        failed: errors.length,
                         skipped: existingMemberIds.length,
-                        total_requested: userIds.length
+                        total_requested: userIds.length,
+                        errors: errors.length > 0 ? errors : undefined
                       });
                     }
                   }
