@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import axios from 'axios';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -31,6 +31,7 @@ const ProjectDetails = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Use useFocusEffect to refresh data when screen gains focus
   useFocusEffect(
@@ -63,7 +64,7 @@ const ProjectDetails = () => {
   };
 
   // Fetch project details from backend
-  const fetchProjectDetails = async () => {
+  const fetchProjectDetails = async (isRefresh = false) => {
     if (!projectId) {
       Alert.alert('Error', 'No project ID provided');
       navigation.goBack();
@@ -71,8 +72,8 @@ const ProjectDetails = () => {
     }
 
     try {
-      // Use project data from navigation params if available
-      if (projectData) {
+      // Use project data from navigation params if available and not refreshing
+      if (projectData && !isRefresh) {
         console.log('Using project data from navigation params');
         setProject(prev => ({
           ...prev,
@@ -85,11 +86,11 @@ const ProjectDetails = () => {
           user_id: projectData.user_id,
           current_stage_id: projectData.current_stage_id,
         }));
-        setLoading(false);
+        if (!isRefresh) setLoading(false);
         return;
       }
 
-      // Fallback: fetch from API if project data not provided
+      // Fallback: fetch from API if project data not provided or refreshing
       console.log('Fetching project details for ID:', projectId);
 
       const email = await AsyncStorage.getItem('email');
@@ -120,21 +121,21 @@ const ProjectDetails = () => {
         }));
       } else {
         Alert.alert('Error', 'Project not found');
-        navigation.goBack();
+        if (!isRefresh) navigation.goBack();
       }
     } catch (error) {
       console.error('Error fetching project details:', error);
       console.error('Error details:', error.response?.status, error.response?.data);
       Alert.alert('Error', 'Failed to load project details');
-      navigation.goBack();
+      if (!isRefresh) navigation.goBack();
     } finally {
-      setLoading(false);
+      if (!isRefresh) setLoading(false);
     }
   };
 
   // Fetch project members separately
-  const fetchProjectMembers = async () => {
-    setMembersLoading(true);
+  const fetchProjectMembers = async (isRefresh = false) => {
+    if (!isRefresh) setMembersLoading(true);
     try {
       console.log('Fetching members for project ID:', projectId);
       const response = await axios.get(`http://192.168.8.116:3000/api/projects/${projectId}/members`);
@@ -152,7 +153,23 @@ const ProjectDetails = () => {
         members: []
       }));
     } finally {
-      setMembersLoading(false);
+      if (!isRefresh) setMembersLoading(false);
+    }
+  };
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        getCurrentUser(),
+        fetchProjectDetails(true),
+        projectId ? fetchProjectMembers(true) : Promise.resolve()
+      ]);
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -256,7 +273,19 @@ const ProjectDetails = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#F6BD0F']} // Android
+          tintColor="#F6BD0F" // iOS
+          title="Pull to refresh" // iOS
+          titleColor="#666" // iOS
+        />
+      }
+    >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
