@@ -5,6 +5,8 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import Icon from 'react-native-vector-icons/FontAwesome';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const sampleProjectImage = require('../../../assets/img/festive.jpg');
+
 const ProjectDetails = () => {
   const route = useRoute();
   const navigation = useNavigation();
@@ -273,7 +275,7 @@ const ProjectDetails = () => {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -325,11 +327,13 @@ const ProjectDetails = () => {
       </View>
 
       {/* Project Image */}
-      {project.image_url && (
-        <View style={styles.imageContainer}>
-          <Image source={{ uri: project.image_url }} style={styles.projectImage} />
-        </View>
-      )}
+      <View style={styles.imageContainer}>
+        <Image
+          source={project.image_url ? { uri: project.image_url } : sampleProjectImage}
+          style={styles.projectImage}
+          resizeMode="cover"
+        />
+      </View>
 
       {/* Project Info */}
       <View style={styles.projectInfo}>

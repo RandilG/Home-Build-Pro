@@ -4,6 +4,9 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
+// Import your sample image from assets
+const sampleProjectImage = require('../../../assets/img/festive.jpg'); // Adjust path as needed
+
 const ViewProjects = () => {
   const navigation = useNavigation();
   const [projects, setProjects] = useState([]);
@@ -22,12 +25,12 @@ const ViewProjects = () => {
 
   const getUserEmail = async () => {
     try {
-      const email = await AsyncStorage.getItem('email'); // Changed from 'userEmail' to 'email'
+      const email = await AsyncStorage.getItem('email');
       if (email) {
         setUserEmail(email);
       } else {
         Alert.alert('Error', 'No user email found. Please login again.');
-        navigation.navigate('Login'); // Navigate back to login if no email found
+        navigation.navigate('Login');
       }
     } catch (error) {
       console.error('Error getting user email:', error);
@@ -54,11 +57,11 @@ const ViewProjects = () => {
       style={styles.projectCard} 
       onPress={() => navigation.navigate('ProjectDetails', { projectId: item.id })}
     >
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.projectImage} />
-      ) : (
-        <View style={styles.imagePlaceholder}><Text>No Image</Text></View>
-      )}
+      <Image 
+        source={item.imageUrl ? { uri: item.imageUrl } : sampleProjectImage} 
+        style={styles.projectImage}
+        resizeMode="cover"
+      />
       <Text style={styles.projectName}>{item.name}</Text>
       <Text style={styles.projectDescription}>{item.description}</Text>
     </TouchableOpacity>
@@ -74,6 +77,7 @@ const ViewProjects = () => {
           data={projects}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -91,6 +95,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
+    color: '#FFFFFF',
   },
   projectCard: {
     backgroundColor: '#FFFFFF',
@@ -109,18 +114,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 10,
   },
-  imagePlaceholder: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#DDD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-    marginBottom: 10,
-  },
   projectName: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#000',
   },
   projectDescription: {
     fontSize: 14,
