@@ -25,10 +25,11 @@ const ProjectPhotos = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { projectId, projectName } = route.params || {};
-  
+
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [user, setUser] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [photoName, setPhotoName] = useState('');
@@ -43,7 +44,7 @@ const ProjectPhotos = () => {
       navigation.goBack();
       return;
     }
-    
+
     fetchUserInfo();
     fetchPhotos();
   }, [projectId]);
@@ -52,7 +53,7 @@ const ProjectPhotos = () => {
     try {
       const userId = await AsyncStorage.getItem('user_id');
       const userName = await AsyncStorage.getItem('username');
-      
+
       if (userId && userName) {
         setUser({
           id: parseInt(userId),
@@ -148,9 +149,9 @@ const ProjectPhotos = () => {
       formData.append('photoName', photoName.trim());
       formData.append('description', photoDescription.trim());
 
-             const response = await axios.post(
-         `http://192.168.8.116:3000/api/projects/${projectId}/photos`,
-         formData,
+      const response = await axios.post(
+        `http://192.168.8.116:3000/api/projects/${projectId}/photos`,
+        formData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -174,10 +175,59 @@ const ProjectPhotos = () => {
     }
   };
 
+  const deletePhoto = async (photo) => {
+    // Check if user owns the photo
+    if (user && photo.userId !== user.id) {
+      Alert.alert('Error', 'You can only delete your own photos');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Photo',
+      `Are you sure you want to delete "${photo.photoName}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+
+              const response = await axios.delete(
+                `http://192.168.8.116:3000/api/projects/${projectId}/photos/${photo.id}`,
+                {
+                  data: { userId: user.id }
+                }
+              );
+
+              if (response.data.success) {
+                Alert.alert('Success', 'Photo deleted successfully');
+                setShowImageModal(false);
+                setSelectedPhoto(null);
+                fetchPhotos(); // Refresh the photos list
+              } else {
+                Alert.alert('Error', response.data.message || 'Failed to delete photo');
+              }
+            } catch (error) {
+              console.error('Error deleting photo:', error);
+              Alert.alert('Error', 'Failed to delete photo');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const viewPhoto = (photo) => {
     setSelectedPhoto(photo);
     setShowImageModal(true);
-    
+
     // Track view
     if (user) {
       axios.post('http://192.168.8.116:3000/api/projects/content/view', {
@@ -204,6 +254,15 @@ const ProjectPhotos = () => {
         <Text style={styles.photoUser} numberOfLines={1}>By: {item.userName}</Text>
         <Text style={styles.photoDate}>{new Date(item.uploadedAt).toLocaleDateString()}</Text>
       </View>
+      {/* Delete button for own photos */}
+      {user && item.userId === user.id && (
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => deletePhoto(item)}
+        >
+          <Icon name="delete" size={16} color="#ff4444" />
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 
@@ -313,6 +372,21 @@ const ProjectPhotos = () => {
             <Icon name="close" size={30} color="#fff" />
           </TouchableOpacity>
           
+          {/* Delete button in full screen view */}
+          {selectedPhoto && user && selectedPhoto.userId === user.id && (
+            <TouchableOpacity 
+              style={styles.imageModalDelete} 
+              onPress={() => deletePhoto(selectedPhoto)}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Icon name="delete" size={24} color="#ff4444" />
+              )}
+            </TouchableOpacity>
+          )}
+          
           {selectedPhoto && (
             <>
               <Image 
@@ -397,6 +471,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    position: 'relative',
   },
   photoImage: {
     width: '100%',
@@ -421,6 +496,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#999',
     marginTop: 2,
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    padding: 6,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   emptyContainer: {
     flex: 1,
@@ -510,6 +598,15 @@ const styles = StyleSheet.create({
     top: 50,
     right: 20,
     zIndex: 1,
+  },
+  imageModalDelete: {
+    position: 'absolute',
+    top: 50,
+    right: 70,
+    zIndex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    padding: 8,
   },
   fullImage: {
     width: width,

@@ -36,6 +36,7 @@ const getProjectMessages = require('../components/projectMessages/getProjectMess
 // Project Photos
 const getProjectPhotos = require('../components/projectPhotos/getProjectPhotos');
 const uploadProjectPhoto = require('../components/projectPhotos/uploadProjectPhoto');
+const deleteProjectPhoto = require('../components/projectPhotos/deleteProjectPhoto');
 
 // Project Reports
 const getProjectReports = require('../components/projectReports/getProjectReports');
@@ -188,6 +189,7 @@ router.post('/projects/:id/messages', sendMessage);
 // Project Photos Routes
 router.get('/projects/:id/photos', getProjectPhotos);
 router.post('/projects/:id/photos', uploadProjectPhoto);
+router.delete('/projects/:id/photos/:photoId', deleteProjectPhoto);
 
 // Project Reports Routes
 router.get('/projects/:id/reports', getProjectReports);
